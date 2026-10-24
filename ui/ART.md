@@ -1,4 +1,4 @@
-# Agent Courtroom art guide
+# Docket art guide
 
 Read this before you touch anything visual, so the dashboard, the courtroom and the case log look like one game.
 
@@ -23,6 +23,10 @@ Two rules hold everything together:
 
 1. **Cute in the art, calm in the data.** Characters, the courtroom and the big moments (OBJECTION!, the verdict stamp) carry all the personality. Numbers, tables and labels stay plain, aligned and readable. The data is never decorated.
 2. **One loud moment at a time.** Per screen, only one thing animates for attention: the speaking character, a burst, or the stamp. Everything else sits still.
+
+## Logo
+
+The logo is a **16×16 pixel gavel striking its block** (`public/docket-logo.svg`): wood browns and a gold band in the courtroom's palette, a highlight pixel on the head, and the same 1px `#120c22` outline every sprite has. It's the header mark at 3x (48px) beside the "Docket" wordmark (Jersey 10, 40px, gold with a `#7a2348` shadow) and the browser-tab icon at 1x. Keep it on the 16px grid so it stays crisp at 16, 32 and 48px. The 8×8 gavel in buttons (`PixelIcon`) is a separate, simpler glyph.
 
 ## The pixel grid
 

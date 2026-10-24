@@ -65,6 +65,11 @@ A missing or mistyped field returns `400 {"error": "..."}`.
 
 While the court deliberates, the worker's state is `on_trial`. If a trial hits `COURT_DEADLINE_MS`, the unfinished steps fall back safely: a lawyer who runs out of time rests, and a Judge who can't rule gives `escalate`.
 
+**Summary judgment (no trial).** For repeat offenders and over-budget workers, the court rules in plain code before calling any model (see "Summary judgment" in [README.md](README.md)). What the engine sees:
+- **The verdict comes back as usual,** but it's always `escalate` or `halt`. It's `escalate` when a worker is charged again soon after a `change_strategy` ruling, or when the court's spend or trial count on that worker hits its limit. It's `halt` when the worker is charged again after that escalation. It returns almost instantly.
+- **`X-Case-Id` still points to a saved trial at `/cases/<id>`,** with `costUsd: 0`, `summary` (`repeat_offender` or `court_budget`), and `priorCaseIds`. The engine's cost check accepts it, and `courtCostUsd` doesn't change.
+- **Send `workerStartedAt`** (the worker's `WorkerStatus.startedAt`) in the packet. Worker IDs repeat across `run`/`compare` invocations, so the court only counts trials from the current run. Without `workerStartedAt`, it guesses the start from the oldest event in the packet, which can miss earlier trials in the same run. The engine doesn't send it yet, and it isn't in `shared/schema.ts`'s `EvidencePacket` yet. The court already accepts it.
+
 **The court doesn't care what the task is.** The engine runs `coding` (fix a failing repo) and `prices` (collect product prices from mock store pages) workers. Either way, progress goes in `testsPassing` / `testsTotal`: tests passing for coding, products resolved for prices. The court reasons over those numbers, so a new task type needs no court changes.
 
 ## 4. UI → court

@@ -78,6 +78,8 @@ body {
 }
 
 h1, h2, h3, .font-display { font-family: var(--font-jersey), sans-serif; font-weight: 400; margin: 0; line-height: 1; letter-spacing: 0.01em; }
+/* Worker ids can be long and unspaced (the Claude Code plugin names them claude-code:<folder>:<id>). */
+h1, h2, h3, .font-display, .px-table td { overflow-wrap: anywhere; }
 
 .vn {
   font-family: var(--font-dotgothic), sans-serif;

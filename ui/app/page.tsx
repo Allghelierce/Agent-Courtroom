@@ -392,7 +392,7 @@ function WorkerCard({ worker: w, selected, onSelect }: { worker: LiveWorker; sel
           <Chibi who="worker" mood={moodFor(w)} scale={2} />
         </span>
         <span className="flex min-w-0 flex-col gap-1">
-          <span className="font-display text-[30px] leading-none">{s.workerId}</span>
+          <span className={`font-display leading-none ${s.workerId.length > 12 ? "text-[20px]" : "text-[30px]"}`}>{s.workerId}</span>
           <span className="text-sm text-soft">Step {s.step}</span>
           <StatusTag state={s.state} />
         </span>
@@ -470,7 +470,7 @@ function Interventions() {
             <tbody>
               {rows.map(({ charge, trial, ruled }) => (
                 <tr key={`${charge.workerId}-${charge.id}`}>
-                  <td className="whitespace-nowrap font-semibold">{charge.workerId}</td>
+                  <td className="max-w-[180px] font-semibold">{charge.workerId}</td>
                   <td>{KIND_LABEL[charge.kind]}</td>
                   <td className="whitespace-nowrap text-soft">{evidenceLabel(charge.eventIds)}</td>
                   <td>
@@ -535,10 +535,10 @@ function ActivityFeed({ only, onClear }: { only: string | null; onClear: () => v
         {rows.map((r, i) => {
           const trial = r.charge ? live.trialFor(r.charge.workerId, r.charge.id) : undefined;
           return (
-            <li key={r.seq} className="grid grid-cols-[12px_92px_80px_1fr] items-baseline gap-3 px-4 py-2 text-sm" style={{ background: i % 2 ? "var(--inset)" : undefined }}>
+            <li key={r.seq} className="grid grid-cols-[12px_92px_120px_1fr] items-baseline gap-3 px-4 py-2 text-sm" style={{ background: i % 2 ? "var(--inset)" : undefined }}>
               <span aria-hidden className="inline-block size-2.5" style={{ background: TONE_COLOR[r.tone] }} />
               <span className="text-soft">{clock(r.at)}</span>
-              <span>{r.workerId}</span>
+              <span className="truncate" title={r.workerId}>{r.workerId}</span>
               {trial ? (
                 <Link href={`/court/${trial.id}`} className="min-w-0 font-semibold underline decoration-2 underline-offset-4">
                   {r.text}

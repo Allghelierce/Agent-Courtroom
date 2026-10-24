@@ -61,6 +61,7 @@ export function estimateUsd(packet: EvidencePacket): number {
   const input = Math.ceil(renderPacket(packet).length / 4) + 500; // + system prompt
   const lawyer = costOf(LAWYER_MODEL, { input_tokens: input, output_tokens: 400 });
   const judge = costOf(JUDGE_MODEL, { input_tokens: input + 800, output_tokens: 800 });
+  if (lawyer === null || judge === null) throw new Error("Unknown model price: update shared/model-prices.json before estimating spend");
   return 2 * lawyer + judge;
 }
 

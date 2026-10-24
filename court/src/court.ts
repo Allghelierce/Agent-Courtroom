@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import Groq from "groq-sdk";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { mockArgument, mockVerdict } from "./mock.ts";
 import { findPrecedents, renderPrecedents } from "./precedent.ts";
@@ -34,23 +35,31 @@ export function modelsFor(provider: Provider): { lawyer: string; judge: string }
 export const LAWYER_MODEL = modelsFor("anthropic").lawyer;
 export const JUDGE_MODEL = modelsFor("anthropic").judge;
 
-// USD per million tokens (input, output). Haiku 5.5 rate is for prompts under 100K tokens,
-// which court prompts always are.
-const PRICES: Record<string, [number, number]> = {
-  "claude-haiku-5-5": [0.1, 0.5],
-  "claude-sonnet-5-5": [2, 10],
-  "claude-opus-5-5": [4, 20],
-  "claude-opus-5": [5, 25],
-  "claude-fable-5-1": [10, 50],
-  // Groq's listed rates, as used by the engine's GroqBrain.
-  "openai/gpt-oss-120b": [0.15, 0.6],
-  "openai/gpt-oss-20b": [0.075, 0.3],
+const PRICES = JSON.parse(readFileSync(new URL("../../shared/model-prices.json", import.meta.url), "utf8")) as {
+  verifiedAt: string; models: Record<string, number[]>; haikuLongContextThreshold: number; haikuLongContextRates: number[];
 };
 
-export function costOf(model: string, usage: { input_tokens: number; output_tokens: number }): number {
-  const [i, o] = PRICES[model] ?? PRICES[JUDGE_MODEL] ?? [0, 0];
-  return (usage.input_tokens * i + usage.output_tokens * o) / 1_000_000;
+type Usage = { input_tokens: number; output_tokens: number; cache_creation_input_tokens?: number | null; cache_read_input_tokens?: number | null; cache_creation?: { ephemeral_1h_input_tokens?: number } | null };
+
+// null when the model has no price in shared/model-prices.json: the trial's cost is then incomplete.
+export function costOf(model: string, usage: Usage): number | null {
+  const key = PRICES.models[model] ? model : model.replace(/-\d{8}$/, "");
+  const writes = usage.cache_creation_input_tokens ?? 0;
+  const reads = usage.cache_read_input_tokens ?? 0;
+  const hour = usage.cache_creation?.ephemeral_1h_input_tokens ?? 0;
+  const long = key === "claude-haiku-5-5" && usage.input_tokens + writes + reads > PRICES.haikuLongContextThreshold;
+  const rates = long ? PRICES.haikuLongContextRates : PRICES.models[key];
+  if (!rates) return null;
+  return (usage.input_tokens * rates[0] + usage.output_tokens * rates[1] + (writes - hour) * rates[2] + hour * rates[3] + reads * rates[4]) / 1_000_000;
 }
+
+function accounting(model: string, usage: Usage) {
+  const cost = costOf(model, usage);
+  return { costUsd: cost ?? 0, costComplete: cost !== null };
+}
+
+// The engine gives up on the court after 60s, so a whole trial must finish well inside that.
+const DEADLINE_MS = Number(process.env.COURT_DEADLINE_MS ?? 50_000);
 
 const ArgumentSchema = z.object({
   argument: z.string(),
@@ -81,56 +90,74 @@ function useMock(opts: CourtOptions): boolean {
 }
 
 // One structured call to a model: system + user prompt in, schema-checked object out.
-type Ask = <T>(role: "lawyer" | "judge", system: string, user: string, schema: z.ZodType<T>, name: string) => Promise<{ out: T; model: string; costUsd: number }>;
+// A reply that arrives but can't be used still reports what it cost; transport errors throw.
+type Reply<T> = { out: T | null; model: string; costUsd: number; costComplete: boolean; usage?: Record<string, unknown>; problem?: string };
+type Ask = <T>(role: "lawyer" | "judge", system: string, user: string, schema: z.ZodType<T>, name: string, signal: AbortSignal) => Promise<Reply<T>>;
 
 function backend(opts: CourtOptions): { ask: Ask; models: { lawyer: string; judge: string } } {
   const provider = opts.provider ?? (opts.groq ? "groq" : opts.client ? "anthropic" : (resolveProvider() ?? "anthropic"));
   const models = modelsFor(provider);
-  return { models, ask: provider === "groq" ? groqAsk(opts.groq ?? new Groq(), models) : anthropicAsk(opts.client ?? new Anthropic(), models) };
+  return {
+    models,
+    ask:
+      provider === "groq"
+        ? // The free tier rate-limits; the SDK backs off and retries inside the trial deadline.
+          groqAsk(opts.groq ?? new Groq({ maxRetries: 3, timeout: 25_000 }), models)
+        : anthropicAsk(opts.client ?? new Anthropic({ maxRetries: 0, timeout: 60_000 }), models),
+  };
 }
 
 function anthropicAsk(client: Anthropic, models: { lawyer: string; judge: string }): Ask {
-  return async <T,>(role: "lawyer" | "judge", system: string, user: string, schema: z.ZodType<T>) => {
+  return async <T,>(role: "lawyer" | "judge", system: string, user: string, schema: z.ZodType<T>, _name: string, signal: AbortSignal) => {
     // Lawyers on the plain endpoint; the Judge gets server-side refusal fallbacks.
     const res =
       role === "lawyer"
-        ? await client.messages.parse({
-            model: models.lawyer,
-            max_tokens: 2000,
-            system,
-            messages: [{ role: "user", content: user }],
-            output_config: { effort: "low", format: zodOutputFormat(schema) },
-          })
-        : await client.beta.messages.parse({
-            model: models.judge,
-            max_tokens: 4000,
-            system,
-            messages: [{ role: "user", content: user }],
-            output_config: { effort: "medium", format: betaZodOutputFormat(schema) },
-            betas: ["server-side-fallback-2026-07-01"],
-            fallbacks: "default",
-          });
+        ? await client.messages.parse(
+            {
+              model: models.lawyer,
+              max_tokens: 2000,
+              system,
+              messages: [{ role: "user", content: user }],
+              output_config: { effort: "low", format: zodOutputFormat(schema) },
+            },
+            { signal },
+          )
+        : await client.beta.messages.parse(
+            {
+              model: models.judge,
+              max_tokens: 4000,
+              system,
+              messages: [{ role: "user", content: user }],
+              output_config: { effort: "medium", format: betaZodOutputFormat(schema) },
+              betas: ["server-side-fallback-2026-07-01"],
+              fallbacks: "default",
+            },
+            { signal },
+          );
     const out = res.parsed_output as T | null;
-    if (res.stop_reason === "refusal" || !out) throw new Error(`no output (stop_reason: ${res.stop_reason})`);
-    return { out, model: res.model, costUsd: costOf(res.model, res.usage) };
+    const problem = res.stop_reason === "refusal" || !out ? `no output (stop_reason: ${res.stop_reason})` : undefined;
+    return { out: problem ? null : out, model: res.model, usage: { ...res.usage }, ...accounting(res.model, res.usage), problem };
   };
 }
 
 function groqAsk(client: Groq, models: { lawyer: string; judge: string }): Ask {
-  return async (role, system, user, schema, name) => {
+  return async (role, system, user, schema, name, signal) => {
     const model = role === "lawyer" ? models.lawyer : models.judge;
     const { $schema: _, ...jsonSchema } = z.toJSONSchema(schema) as Record<string, unknown>;
     const request = (format: "json_schema" | "json_object") =>
-      client.chat.completions.create({
-        model,
-        max_completion_tokens: role === "lawyer" ? 2000 : 4000,
-        reasoning_effort: role === "lawyer" ? "low" : "medium",
-        messages: [
-          { role: "system", content: format === "json_object" ? `${system}\nReply with one JSON object matching: ${JSON.stringify(jsonSchema)}` : system },
-          { role: "user", content: user },
-        ],
-        response_format: format === "json_schema" ? { type: "json_schema", json_schema: { name, schema: jsonSchema } } : { type: "json_object" },
-      });
+      client.chat.completions.create(
+        {
+          model,
+          max_completion_tokens: role === "lawyer" ? 2000 : 4000,
+          reasoning_effort: role === "lawyer" ? "low" : "medium",
+          messages: [
+            { role: "system", content: format === "json_object" ? `${system}\nReply with one JSON object matching: ${JSON.stringify(jsonSchema)}` : system },
+            { role: "user", content: user },
+          ],
+          response_format: format === "json_schema" ? { type: "json_schema", json_schema: { name, schema: jsonSchema } } : { type: "json_object" },
+        },
+        { signal },
+      );
     let res;
     try {
       res = await request("json_schema");
@@ -139,11 +166,16 @@ function groqAsk(client: Groq, models: { lawyer: string; judge: string }): Ask {
       if (!(err instanceof Groq.BadRequestError)) throw err;
       res = await request("json_object");
     }
-    const text = res.choices[0]?.message?.content;
-    if (!text) throw new Error(`no output (finish_reason: ${res.choices[0]?.finish_reason})`);
-    const out = schema.parse(JSON.parse(text));
+    const served = res.model ?? model;
     const usage = { input_tokens: res.usage?.prompt_tokens ?? 0, output_tokens: res.usage?.completion_tokens ?? 0 };
-    return { out, model: res.model ?? model, costUsd: costOf(res.model ?? model, usage) };
+    const spend = { model: served, usage: { ...usage }, ...accounting(served, usage) };
+    const text = res.choices[0]?.message?.content;
+    if (!text) return { out: null, ...spend, problem: `no output (finish_reason: ${res.choices[0]?.finish_reason})` };
+    try {
+      return { out: schema.parse(JSON.parse(text)), ...spend };
+    } catch (err) {
+      return { out: null, ...spend, problem: `invalid output: ${String(err).slice(0, 300)}` };
+    }
   };
 }
 
@@ -159,18 +191,19 @@ export async function holdTrial(packet: EvidencePacket, opts: CourtOptions = {})
   const court = mock ? undefined : backend(opts);
   const evidence = renderPacket(packet);
   const validIds = new Set(packet.events.map((e) => e.id));
+  const signal = AbortSignal.timeout(DEADLINE_MS);
 
   const [prosecution, defense] = await Promise.all(
     (["prosecution", "defense"] as Side[]).map((side) =>
-      court ? argue(court.ask, court.models.lawyer, side, evidence, validIds) : Promise.resolve(mockArgument(side, packet)),
+      court ? argue(court.ask, court.models.lawyer, side, evidence, validIds, signal) : Promise.resolve(mockArgument(side, packet)),
     ),
   );
 
   const precedents = opts.past?.length ? findPrecedents(packet, opts.past) : [];
 
-  const { verdict, costUsd: judgeCost } = court
-    ? await judge(court.ask, evidence, prosecution, defense, validIds, renderPrecedents(precedents))
-    : { verdict: mockVerdict(packet), costUsd: 0 };
+  const judged = court
+    ? await judge(court.ask, court.models.judge, evidence, prosecution, defense, validIds, signal, renderPrecedents(precedents))
+    : { verdict: mockVerdict(packet), costUsd: 0, costComplete: true, model: "mock", usage: undefined };
 
   const trial: Trial = {
     id: `case-${randomUUID().slice(0, 8)}`,
@@ -178,10 +211,13 @@ export async function holdTrial(packet: EvidencePacket, opts: CourtOptions = {})
     charge: packet.charge,
     prosecution,
     defense,
-    verdict,
+    verdict: judged.verdict,
     precedents: precedents.map((t) => t.id),
-    judgeModel: court ? court.models.judge : "mock",
-    costUsd: round(prosecution.costUsd + defense.costUsd + judgeCost),
+    judgeModel: judged.model,
+    judgeUsage: judged.usage,
+    costUsd: round(prosecution.costUsd + defense.costUsd + judged.costUsd),
+    costComplete: (prosecution.costComplete ?? mock) && (defense.costComplete ?? mock) && judged.costComplete,
+    pricingDate: PRICES.verifiedAt,
     startedAt,
     finishedAt: new Date().toISOString(),
     mock,
@@ -190,40 +226,39 @@ export async function holdTrial(packet: EvidencePacket, opts: CourtOptions = {})
   return trial;
 }
 
-async function argue(ask: Ask, model: string, side: Side, evidence: string, validIds: Set<number>): Promise<Argument> {
+async function argue(ask: Ask, model: string, side: Side, evidence: string, validIds: Set<number>, signal: AbortSignal): Promise<Argument> {
+  const system = side === "prosecution" ? PROSECUTOR_SYSTEM : DEFENSE_SYSTEM;
+  const rests = (why: string) => `The ${side} rests without argument (court error: ${why}).`;
   try {
-    const system = side === "prosecution" ? PROSECUTOR_SYSTEM : DEFENSE_SYSTEM;
-    const res = await ask("lawyer", system, `EVIDENCE PACKET\n\n${evidence}\n\nMake your argument.`, ArgumentSchema, "argument");
-    return {
-      side,
-      model: res.model,
-      argument: res.out.argument,
-      cited_events: res.out.cited_events.filter((id) => validIds.has(id)),
-      costUsd: res.costUsd,
-    };
+    const res = await ask("lawyer", system, `EVIDENCE PACKET\n\n${evidence}\n\nMake your argument.`, ArgumentSchema, "argument", signal);
+    const spend = { costUsd: res.costUsd, costComplete: res.costComplete, usage: res.usage };
+    if (!res.out) return { side, model: res.model, argument: rests(res.problem ?? "no output"), cited_events: [], ...spend };
+    return { side, model: res.model, argument: res.out.argument, cited_events: res.out.cited_events.filter((id) => validIds.has(id)), ...spend };
   } catch (err) {
-    return { side, model, argument: `The ${side} rests without argument (court error: ${String(err)}).`, cited_events: [], costUsd: 0 };
+    // Nothing came back, so nothing is known about what it cost.
+    return { side, model, argument: rests(String(err)), cited_events: [], costUsd: 0, costComplete: false };
   }
 }
 
 async function judge(
   ask: Ask,
+  model: string,
   evidence: string,
   prosecution: Argument,
   defense: Argument,
   validIds: Set<number>,
+  signal: AbortSignal,
   precedents = "",
-): Promise<{ verdict: Verdict; costUsd: number }> {
+): Promise<{ verdict: Verdict; costUsd: number; costComplete: boolean; model: string; usage?: Record<string, unknown> }> {
   const prior = precedents ? `\n\n${precedents}\n(Earlier rulings on similar charges. Follow them only where this case's evidence is truly alike.)` : "";
   const content = `EVIDENCE PACKET\n\n${evidence}${prior}\n\nPROSECUTION ARGUES:\n${prosecution.argument}\n\nDEFENSE ARGUES:\n${defense.argument}\n\nIssue your verdict.`;
+  const noVerdict = (why: string): Verdict => ({ ruling: "escalate", reasoning: `The court could not reach a verdict (${why}), so the case goes to a human.`, cited_events: [] });
   try {
-    const res = await ask("judge", JUDGE_SYSTEM, content, VerdictSchema, "verdict");
-    return { verdict: normalizeVerdict(res.out, validIds), costUsd: res.costUsd };
+    const res = await ask("judge", JUDGE_SYSTEM, content, VerdictSchema, "verdict", signal);
+    const spend = { costUsd: res.costUsd, costComplete: res.costComplete, model: res.model, usage: res.usage };
+    return { verdict: res.out ? normalizeVerdict(res.out, validIds) : noVerdict(res.problem ?? "no output"), ...spend };
   } catch (err) {
-    return {
-      verdict: { ruling: "escalate", reasoning: `The court could not reach a verdict (${String(err)}), so the case goes to a human.`, cited_events: [] },
-      costUsd: 0,
-    };
+    return { verdict: noVerdict(String(err)), costUsd: 0, costComplete: false, model };
   }
 }
 

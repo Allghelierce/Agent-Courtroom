@@ -72,6 +72,8 @@ export type Argument = {
   argument: string;
   cited_events: number[]; // only IDs that exist in the packet
   costUsd: number;
+  costComplete?: boolean;
+  usage?: Record<string, unknown>;
 };
 
 export type Trial = {
@@ -84,6 +86,9 @@ export type Trial = {
   precedents?: string[]; // ids of earlier trials shown to the Judge
   judgeModel: string;
   costUsd: number; // total court spend for this trial
+  costComplete?: boolean;
+  judgeUsage?: Record<string, unknown>;
+  pricingDate?: string;
   startedAt: string;
   finishedAt: string;
   mock: boolean; // true when no model was called

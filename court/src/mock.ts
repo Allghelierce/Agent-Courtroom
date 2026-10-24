@@ -38,6 +38,16 @@ export function mockVerdict(p: EvidencePacket): Verdict {
   const cited = [...new Set([...p.charge.eventIds, ...(p.stats.repeatedCalls[0]?.eventIds ?? [])])].sort((a, b) => a - b);
   const err = p.stats.lastError;
 
+  // False alarm: tests rose across the charged events, so the "repeats" are progress.
+  const charged = p.events.filter((e) => p.charge.eventIds.includes(e.id));
+  const last = p.events.at(-1);
+  if (charged.length && last && last.testsPassing > charged[0].testsPassing && p.spend.fractionOfBudget < 0.9) {
+    return {
+      ruling: "continue",
+      reasoning: `Tests rose from ${charged[0].testsPassing} to ${last.testsPassing} across the charged events, so the repeated calls are progress, not a loop.`,
+      cited_events: charged.map((e) => e.id),
+    };
+  }
   if (p.spend.fractionOfBudget >= 0.9) {
     return { ruling: "halt", reasoning: `Spend is at ${Math.round(p.spend.fractionOfBudget * 100)}% of budget with no recent progress, so further work is not worth the cost.`, cited_events: cited };
   }

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { MONITORS, Sparkline } from "@/components/Console";
 import { CourtScene } from "@/components/CourtScene";
 import { Meter, PixelIcon, RulingTag, StatusTag, WarningLights } from "@/components/Pieces";
+import { NeedsHuman } from "@/components/NeedsHuman";
 import { Chibi } from "@/components/Sprites";
 import { CHARGE_PHRASE, KIND_LABEL, RULING_LABEL, STATE_LABEL, clock, describeEvent, usd, type Charge, type Ruling, type Trial } from "@/lib/data";
 import { useLive, type FeedItem, type LiveWorker } from "@/lib/live";
@@ -21,6 +22,8 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col gap-8">
+      {/* A worker paused for a human decision outranks everything else on the page. */}
+      <NeedsHuman />
       {inSession ? (
         <InSession key={`${inSession.workerId}-${inSession.id}`} charge={inSession} trial={live.trialFor(inSession.workerId, inSession.id ?? 0)} others={alsoInSession} />
       ) : latest ? (

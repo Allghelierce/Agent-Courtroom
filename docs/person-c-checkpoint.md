@@ -23,16 +23,16 @@ under a unique `runs/smoke/` directory.
   (`Operation not permitted`). TypeScript passes; this does not establish browser behavior.
   Try `cd ui && npm run build` in your terminal and record any remaining error.
 - Real Groq/Claude calls and paid court behavior have not been exercised in this checkpoint.
-- Success criteria and independent outcome review remain in
-  [questions.md](../decisions/questions.md). Scripted completion is integration
+- Recovery is the chosen success criterion; the independent verification method
+  remains to be decided in [decisions.md](decisions.md). Scripted completion is integration
   evidence, not measured model quality or real cost savings. Court permission to
   override the task's restrictions is part of the comparison.
 - Record the final demo after the browser walkthrough. No backup video exists yet.
 
 ## Your next three steps
 
-1. Write the three answers in section 1 of `decisions/questions.md`: success,
-   allowed changes, and verification. This is evaluation design.
+1. Finish section 1 of `docs/decisions.md`: choose the independent verification
+   method for the selected recovery rule. This is evaluation design.
 2. Run `python3.12 scripts/smoke.py`. Inspect its `report.json` and one raw
    court-on/off pair. Reconcile worker plus court cost yourself. This is reliability
    testing and data validation.

@@ -1,8 +1,8 @@
-# Person C: questions and decisions
+# Person C: decisions
 
-Work through these alongside the [Person C checkpoint and next steps](../docs/person-c-checkpoint.md). **Answer section 1 first.** The other sections are learning prompts for when we test the implementation; they do not need to block coding.
+Work through these alongside the [Person C checkpoint and next steps](person-c-checkpoint.md). **Finish section 1 first.** The other sections are learning prompts for when we test the implementation; they do not need to block coding.
 
-Recommendations below are proposals, not decisions you have already made. Write your answers under each section or tell me in chat.
+Signed answers record decisions. Unanswered questions and recommendations remain proposals.
 
 ## 1. What counts as success in our benchmark?
 
@@ -13,6 +13,11 @@ Recommendations below are proposals, not decisions you have already made. Write 
 **What you do:** decide how we judge the result before looking at which version wins.
 
 1. Should fixing the normal bugs, mocking the unreachable service, and flagging payment integration as unverified count as **recovered**?
+
+   **Decision: Recovery.** Count the run as recovered when the normal bugs are fixed, tests pass, and the unreachable service is explicitly mocked with real integration marked unverified. Deleting tests or weakening unrelated assertions does not count. Apply the same rule to court-on and court-off runs. Recovery does not mean production-ready.
+
+   **Proposed: Chris Kim - October 24, 2026.**
+
 2. Which changes are allowed? My recommendation: allow an explicit, documented mock for the unreachable service; do not count deleting tests or weakening unrelated assertions as recovery.
 3. How will we verify the outcome independently? My recommendation: inspect the diff, run the tests, and check that the unresolved integration is explicitly flagged.
 4. Are both runs starting with the same files, worker prompt, model, tools, budget, and step limit? The court intervention should be the intended difference.
@@ -31,8 +36,8 @@ Keep the actual termination reason too: timeout, budget exhausted, halt, or awai
 
 **Your answer — three sentences are enough:**
 
-- Success rule: _not decided yet_
-- Allowed changes: _not decided yet_
+- Success rule: **Recovery**, as decided under question 1 above.
+- Allowed changes: Fix normal bugs and explicitly mock the unreachable service; do not delete tests or weaken unrelated assertions.
 - Verification method: _not decided yet_
 
 ## 2. How should stored events behave after a crash?

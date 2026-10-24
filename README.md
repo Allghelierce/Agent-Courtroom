@@ -69,7 +69,7 @@ Real workers require `pip install -r engine/requirements.txt` in a virtual
 environment and the selected provider's key: `GROQ_API_KEY` or
 `ANTHROPIC_API_KEY`. Select `--brain groq` or `--brain claude`; `--model` is
 optional. The benchmark also requires your `--success-criteria` text from
-[questions.md](decisions/questions.md). This records the rule; it does not
+[decisions.md](docs/decisions.md). This records the rule; it does not
 automatically verify it. To use a real court, run it separately with
 `COURT_MOCK` unset and `ANTHROPIC_API_KEY` available. The demo launcher always
 uses a mock court.

@@ -1,8 +1,9 @@
-// Drives the built plugin the way Claude Code does: each hook is `node dist/hook.mjs <Event>`
+// Drives the committed plugin the way Claude Code does: each hook is `node dist/hook.mjs <Event>`
 // with JSON on stdin. The first hook starts the daemon (mock court, temp home, free port).
+// It doesn't rebuild dist/: test/dist.test.ts fails if dist/ is stale.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -44,7 +45,6 @@ const edit = (from: string, to: string) =>
   toolCall("PostToolUse", { tool_name: "Edit", tool_input: { file_path: "/work/shop/payments.py", old_string: from, new_string: to }, tool_response: { filePath: "/work/shop/payments.py" } });
 
 before(async () => {
-  execFileSync(process.execPath, ["build.mjs"], { cwd: plugin });
   port = await new Promise<number>((ok) => {
     const s = createServer().listen(0, "127.0.0.1", () => {
       const p = (s.address() as { port: number }).port;

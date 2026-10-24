@@ -71,6 +71,8 @@ Then open http://localhost:3000.
 cd court && npm install    # the plugin builds and tests with court/'s dev dependencies
 cd ../plugin
 npm run build              # writes dist/ (commit it: installs don't build)
-npm test                   # monitor parity with the Python engine, mapping, cost, end to end
+npm test                   # monitor parity with the Python engine, mapping, cost, end to end, dist freshness
 npm run typecheck
 ```
+
+`dist/daemon.mjs` bundles `court/src`, so **run `npm run build` here after any change to `court/` or `plugin/src`, and commit `dist/`**. The `dist/ matches a fresh build` test fails until you do.

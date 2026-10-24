@@ -39,7 +39,7 @@ curl localhost:4100/cases                                   # every Trial, oldes
 curl localhost:4100/cases/case-d399b1db                     # one Trial, 404 if missing
 ```
 
-**Engine endpoint.** `POST /verdict` is the contract from `shared/schema.ts`. The body is the engine's `EvidencePacket`, `{charge, events, testProgress, spend: {costUsd, budgetUsd}, task}`. The response is just the `Verdict`, and the saved trial's ID comes back in the `X-Case-Id` header. A missing or mistyped field returns 400. To build a body from the fixture by hand:
+**Engine endpoint.** `POST /verdict` is the contract from `shared/schema.ts`. The body is the engine's `EvidencePacket`, `{charge, events, testProgress, spend: {costUsd, budgetUsd}, task}`. The response is just the `Verdict`. The saved trial's ID comes back in the `X-Case-Id` header, and the IDs of any precedents the Judge was shown come back comma-separated in `X-Precedents` (empty if none). A missing or mistyped field returns 400. To build a body from the fixture by hand:
 
 ```bash
 node -e 'const r=require("./fixtures/looping-run.json"), ev=r.events; console.log(JSON.stringify({
@@ -52,6 +52,8 @@ curl -i -X POST localhost:4100/verdict \
 ```
 
 Run with `COURT_MOCK=1` to try it without calling a model.
+
+**Precedent.** `/convene` and `/verdict` both pass the whole case log (`court/cases/`) to `holdTrial` as `past`, so the court learns from its own earlier rulings. A trial's precedent IDs are in `trial.precedents`. Recent trials from the *same* worker are skipped (see `src/precedent.ts`), so a worker's first trial and its retrial two minutes later won't cite each other. A trial from another worker will.
 
 ## Calling the court from the engine (Python)
 

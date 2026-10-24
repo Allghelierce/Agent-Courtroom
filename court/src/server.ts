@@ -18,7 +18,7 @@ const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Expose-Headers": "X-Case-Id",
+  "Access-Control-Expose-Headers": "X-Case-Id, X-Precedents",
 };
 
 class HttpError extends Error {
@@ -54,13 +54,13 @@ async function convene(req: IncomingMessage): Promise<Trial> {
   if (typeof body.budgetUsd !== "number") throw new HttpError(400, "budgetUsd must be a number");
 
   const packet = buildPacket(body.charge, body.events, { budgetUsd: body.budgetUsd });
-  const trial = await holdTrial(packet);
+  const trial = await holdTrial(packet, { past: await listTrials(CASES_DIR) });
   await saveTrial(trial, CASES_DIR);
   return trial;
 }
 
 // The engine's contract (shared/schema.ts): POST an EvidencePacket, get a bare Verdict back.
-async function verdict(req: IncomingMessage): Promise<{ verdict: Verdict; caseId: string }> {
+async function verdict(req: IncomingMessage): Promise<{ verdict: Verdict; caseId: string; precedents: string[] }> {
   const body = (await readJson(req)) as Partial<EnginePacket> | null;
   if (!body?.charge || typeof body.charge !== "object") throw new HttpError(400, "missing charge");
   if (!Array.isArray(body.events)) throw new HttpError(400, "events must be an array");
@@ -70,9 +70,10 @@ async function verdict(req: IncomingMessage): Promise<{ verdict: Verdict; caseId
   }
   if (typeof body.task !== "string") throw new HttpError(400, "task must be a string");
 
-  const trial = await holdTrial(fromEnginePacket(body as EnginePacket));
+  // The court learns from its own case log: similar past trials go to the Judge as precedent.
+  const trial = await holdTrial(fromEnginePacket(body as EnginePacket), { past: await listTrials(CASES_DIR) });
   await saveTrial(trial, CASES_DIR);
-  return { verdict: trial.verdict, caseId: trial.id };
+  return { verdict: trial.verdict, caseId: trial.id, precedents: trial.precedents ?? [] };
 }
 
 async function getTrial(id: string): Promise<Trial> {
@@ -94,8 +95,8 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && pathname === "/health") return send(res, 200, { ok: true });
     if (req.method === "POST" && pathname === "/convene") return send(res, 200, await convene(req));
     if (req.method === "POST" && pathname === "/verdict") {
-      const { verdict: v, caseId: id } = await verdict(req);
-      return send(res, 200, v, { "X-Case-Id": id });
+      const { verdict: v, caseId: id, precedents } = await verdict(req);
+      return send(res, 200, v, { "X-Case-Id": id, "X-Precedents": precedents.join(",") });
     }
     if (req.method === "GET" && pathname === "/cases") return send(res, 200, await listTrials(CASES_DIR));
     if (req.method === "GET" && caseId) return send(res, 200, await getTrial(decodeURIComponent(caseId)));

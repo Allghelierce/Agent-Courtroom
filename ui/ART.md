@@ -1,28 +1,17 @@
 # Agent Courtroom art guide
 
-Read this before you touch anything visual. The UI has two modes on purpose, and each has its own rules.
+Read this before you touch anything visual, so the dashboard, the courtroom and the case log look like one game.
 
-## Two modes
+## How the UI fits together
 
-**The console is the product. The courtroom is how it explains itself.**
+**The courtroom is the face. The numbers prove it works.**
 
-| | Console (serious) | Stage (cute) |
-|---|---|---|
-| Where | Overview, Cases, a case's **Record** tab, the site header | A case's **Replay** tab: the courtroom, dialogue, cut-ins |
-| Job | Show that the system works: money saved, interventions, cost of oversight, evidence | Make one decision memorable and easy to follow |
-| Type | IBM Plex Sans, 13–15px body, 24–30px numbers, tabular figures | Pixelify Sans and DotGothic16 (below) |
-| Surfaces | `.card`, `.btn`, `.chip`, `table.data`: 1px `--c-line` borders, 6–8px radius, no shadows | `.px-box`, `.px-btn`, `.px-tag`: 4px borders, square corners, hard shadows |
-| Colour | `--c-*` neutrals; role colours only as small chips, bars and dots | The palette below, the scene, the characters |
-| Motion | None, except a soft pulse on "In session" | Everything in "Motion" below |
-
-Rules for keeping them apart:
-
-- Anything inside a `.stage` wrapper is pixel art; everything else is the console. Don't mix: no chibis or pixel fonts in the console, no Plex or rounded corners on the stage.
-- The console leads with outcomes and evidence, never with characters. Every case links to both views: **Record** (the audit) and **Replay** (the trial).
-- The one shared thread is the role colours. Gold, red, blue, green and amber mean the same thing in both modes, so a ruling chip in the console matches the stamp in the courtroom.
-- Charges decided without a trial (summary judgment: repeat offender, court over budget) get a short card in the Replay tab, not the full courtroom.
-
-The rest of this guide is about the stage.
+- **The courtroom leads.** The dashboard opens on the courtroom scene: the live trial while court is in session, otherwise the latest intervention. Then the impact numbers (saved vs. unsupervised, interventions, cost of oversight), the with/without comparison, the monitor rules, the workers, the interventions table and the activity log.
+- **Pixel chrome, readable data.** Every surface is pixel art: 4px borders, hard shadows, Pixelify headings, pixel buttons and tags. But text, numbers and tables are IBM Plex Sans with tabular figures, so the data reads like a real tool, not a game menu.
+- **The courtroom's own text stays in-world.** The dialogue box and the evidence pinned in the scene use DotGothic16 (the `.vn` class); cut-ins and the stamp use Pixelify.
+- **One plain view.** Each case also has a **Record** tab: the same case as an audit (charge, ruling, instruction sent, outcome, arguments, the evidence table, the verdict JSON). It lives inside `.console` and uses flat hairline `.card`s, `.btn`s, `.chip`s and `table.data`, for anyone checking the work. It's the only place without pixel chrome.
+- **Role colours are shared.** Gold, red, blue, green and amber mean the same thing everywhere, so a ruling chip in the Record matches the stamp in the courtroom.
+- Charges decided without a trial (summary judgment: repeat offender, court over budget) get a short ruling card instead of the full courtroom.
 
 ## North star
 
@@ -48,7 +37,7 @@ One dark theme: the palette of the original anime-pixel mockup. Tokens live in `
 
 | Token | Hex | Use |
 |---|---|---|
-| `--bg` | `#0b0814` | Page background (with a faint `#0e0a1a` 8px checker). |
+| `--bg` | `#0b0814` | Page background: an 8px `#120d21` checker, hard 2px scanlines and sparse `--edge` pixel stars. Static. |
 | `--panel` | `#1b1430` | Panel and card fill. |
 | `--inset` | `#120c22` | Sunken areas, empty meter cells, ghost buttons. |
 | `--edge` | `#3b2f57` | Panel borders and pixel outlines in the UI. |
@@ -78,11 +67,12 @@ Status mapping (dashboard, case log, badges):
 
 ## Type
 
-- **Pixelify Sans** (600/700): headings, names, buttons, the verdict stamp. Chunky and friendly.
-- **DotGothic16**: body text, dialogue, numbers, tables. It's the JRPG text box font, and its digits are even width, so numbers line up.
-- Scale (px): **12 · 16 · 20 · 28 · 40**. Body is 16, dialogue is 20, page titles are 28, the stamp and bursts are 40+.
-- Sentence case everywhere. Character names in the name tag are the only all-caps text (it's a visual-novel convention).
-- No monospace, no system fonts, no third typeface.
+- **Pixelify Sans** (500/700): headings, worker names, buttons, tags, the verdict stamp. Chunky and friendly.
+- **IBM Plex Sans** (400/500/600): body text, labels, numbers and tables, with tabular figures so numbers line up. This is what makes the data look trustworthy.
+- **DotGothic16**: the courtroom's dialogue box and in-scene evidence only (`.vn`). It's the JRPG text-box font.
+- Scale (px): **12 · 13 · 15 · 20 · 28 · 32 · 40**. Body is 15, small labels 13, dialogue 20, page titles 28, headline numbers 32, the stamp and bursts 40+.
+- Sentence case everywhere. Character names in the dialogue name tag are the only all-caps text (it's a visual-novel convention).
+- No monospace, and no typeface beyond these three.
 
 ## Shapes and surfaces
 
@@ -92,6 +82,7 @@ Use the shared classes in `app/globals.css`. Don't hand-roll borders.
 - `.px-inset`: a sunken area inside a panel (inset fill, no shadow).
 - `.px-btn`: a pressable button. It sits on a 4px shadow and drops onto it when pressed. Gold is primary, `.red` is the "watch the trial" call to action, `.ghost` is secondary.
 - `.px-tag`: a small coloured label (status badges, the dialogue name tag).
+- `.px-table`: data tables inside a `.px-box` (interventions). Pixel rules between rows, plain Plex cells.
 - Meters are **segmented**: 12 or 20 square cells with a 4px gap, never a smooth bar. Tests passing uses one cell per test.
 - Warning lights are 4 square pixel lamps (looping, stuck, overspend, flailing). Off is a hollow edge-coloured square, on is a filled role colour with a 4px "glow" ring in the same colour at 40%.
 

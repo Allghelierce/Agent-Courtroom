@@ -4,10 +4,9 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { CourtScene } from "@/components/CourtScene";
-import { RulingChip } from "@/components/Console";
-import { StatusTag } from "@/components/Pieces";
+import { PixelIcon, RulingTag, StatusTag } from "@/components/Pieces";
 import { Portrait } from "@/components/Sprites";
-import { COURT_URL, ENGINE_URL, KIND_LABEL, RULING_COLOR, RULING_LABEL, describeEvent, eventFailed, usd, type Event, type Trial } from "@/lib/data";
+import { CHARGE_PHRASE, COURT_URL, ENGINE_URL, RULING_COLOR, RULING_LABEL, describeEvent, eventFailed, usd, type Event, type Trial } from "@/lib/data";
 import { useLive } from "@/lib/live";
 import { buildScript, type Line } from "@/lib/script";
 import { blip, gavel, objection, setSoundEnabled } from "@/lib/sound";
@@ -56,10 +55,10 @@ export function Courtroom() {
   if (!trial) {
     const loading = trial === undefined;
     return (
-      <div className="card flex flex-col items-start gap-3 p-6">
-        <h1 className="text-[20px]">{loading ? "Loading the case..." : "No case with that id"}</h1>
-        {!loading && <p className="m-0 text-c-soft">Case {id} isn&apos;t in the case log.</p>}
-        <Link href="/cases" className="btn">Open the case log</Link>
+      <div className="px-box flex flex-col items-start gap-4 p-6">
+        <h1 className="text-[28px]">{loading ? "Calling the court to order..." : "No case with that number"}</h1>
+        {!loading && <p className="m-0">Case {id} isn&apos;t in the case log. Pick a trial from the list to watch it.</p>}
+        <Link href="/cases" className="px-btn">Open the case log</Link>
       </div>
     );
   }
@@ -68,24 +67,23 @@ export function Courtroom() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <span className="text-[13px] text-c-soft">
-            <Link href="/cases" className="no-underline hover:underline">Cases</Link> / {trial.id}
-          </span>
-          <h1 className="flex flex-wrap items-center gap-3 text-[24px]">
-            {trial.workerId}: {KIND_LABEL[trial.charge.kind].toLowerCase()}
-            <RulingChip ruling={trial.verdict.ruling} />
+          <Link href="/cases" className="text-sm text-soft">Back to the case log</Link>
+          <h1 className="text-[28px]">
+            {trial.workerId} is charged with {CHARGE_PHRASE[trial.charge.kind]}
           </h1>
+          <span className="text-sm text-soft">Case {trial.id}</span>
         </div>
-        <nav className="flex gap-1 rounded-lg p-1" style={{ background: "var(--c-panel)", border: "1px solid var(--c-line)" }} aria-label="Case views">
+        {/* The courtroom is the case; the record is the same case as a plain audit, for anyone checking the work. */}
+        <nav className="flex gap-3" aria-label="Case views">
           {(["replay", "record"] as const).map((v) => (
             <Link
               key={v}
               href={v === "record" ? `/court/${trial.id}?view=record` : `/court/${trial.id}`}
               aria-current={view === v ? "page" : undefined}
-              className="rounded-md px-3 py-1.5 text-[13px] font-medium no-underline"
-              style={{ background: view === v ? "var(--c-raise)" : undefined, color: view === v ? "var(--c-text)" : "var(--c-soft)" }}
+              className={`px-btn ${view === v ? "" : "ghost"}`}
             >
-              {v === "replay" ? "Replay" : "Record"}
+              <PixelIcon name={v === "replay" ? "gavel" : "scroll"} />
+              {v === "replay" ? "Courtroom" : "Record"}
             </Link>
           ))}
         </nav>
@@ -196,7 +194,7 @@ function TrialView({ trial }: { trial: Trial }) {
   const evidence = (line.cites ?? []).flatMap((n) => events.get(n) ?? []);
 
   return (
-    <div className="stage flex flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <div key={cutIn ? idx : "stage"} className={`relative overflow-hidden border-4 border-edge bg-[#2a1d4a] ${cutIn ? "shake" : ""}`} style={{ boxShadow: "4px 4px 0 var(--shadow)" }}>
         <button type="button" onClick={advance} aria-label="Next line" className="block w-full cursor-pointer border-0 bg-transparent p-0">
           <CourtScene
@@ -211,16 +209,18 @@ function TrialView({ trial }: { trial: Trial }) {
         {evidence.length > 0 && <SceneEvidence key={idx} events={evidence.slice(-3)} />}
         {line.burst && still && <div className={`burst show ${line.burst.tone}`} aria-hidden>{line.burst.text}</div>}
         {cutIn && <CutIn line={line} />}
-        {line.verdict && <VerdictStamp trial={trial} />}
+        {line.verdict && cutIn && <div key={`flash-${idx}`} className="flash late pointer-events-none absolute inset-0" aria-hidden />}
+        {line.verdict && <VerdictStamp trial={trial} late={cutIn} />}
+        {idx === 0 && !still && <Curtain />}
 
         {/* The dialogue box sits over the floor on wide screens, visual-novel style, and below the scene on phones. */}
-        <div className="border-t-4 border-edge bg-panel lg:absolute lg:inset-x-0 lg:bottom-4 lg:mx-auto lg:max-w-[960px] lg:border-4 lg:shadow-[4px_4px_0_var(--shadow)]" aria-live="polite">
+        <div className="vn border-t-4 border-edge bg-panel lg:absolute lg:inset-x-0 lg:bottom-4 lg:mx-auto lg:max-w-[960px] lg:border-4 lg:shadow-[4px_4px_0_var(--shadow)]" aria-live="polite">
           <div className="flex gap-4 p-3">
-            <div className="hidden shrink-0 self-start border-4 border-edge sm:block">
+            <div className={`hidden shrink-0 self-start border-4 border-edge sm:block ${done ? "" : "talk"}`}>
               <Portrait who={line.who} mood={line.mood} scale={2} />
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <span className="px-tag self-start" style={{ background: cast.tag, color: "var(--on-accent)" }}>{name}</span>
+              <span key={idx} className="px-tag tag-in self-start" style={{ background: cast.tag, color: "var(--on-accent)" }}>{name}</span>
               <p className="m-0 min-h-[4em] text-[20px] leading-snug">{line.text.slice(0, shown)}</p>
               <span className={`self-end font-display text-sm ${done && !last ? "blink" : "invisible"}`} aria-hidden>▼</span>
             </div>
@@ -239,28 +239,41 @@ function TrialView({ trial }: { trial: Trial }) {
 
       {reachedVerdict && <AfterVerdict trial={trial} outcome={outcome} events={events} />}
 
-      <div className="grid gap-6">
+      <div className="grid gap-6 lg:grid-cols-2">
         <section className="px-box flex flex-col gap-3 p-4" aria-labelledby="evidence-h">
           <h2 id="evidence-h" className="text-[20px]">Evidence</h2>
           {evidence.length === 0 ? (
             <p className="m-0 text-sm text-soft">{line.cites?.length ? `Cites ${line.cites.map((n) => `event ${n}`).join(", ")}.` : "No events cited in this line."}</p>
           ) : (
-            <ul className="m-0 flex list-none flex-col gap-2 p-0">
-              {evidence.map((e) => (
-                <EventCard key={e.id} event={e} />
+            <ul key={idx} className="m-0 flex list-none flex-col gap-2 p-0">
+              {evidence.map((e, i) => (
+                <EventCard key={e.id} event={e} delay={i * 80} />
               ))}
             </ul>
           )}
         </section>
 
+        <section className="px-box flex flex-col gap-3 p-4" aria-labelledby="facts-h">
+          <h2 id="facts-h" className="text-[20px]">The case</h2>
+          <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+            <dt className="text-soft">Charge</dt>
+            <dd className="m-0">{trial.charge.summary}</dd>
+            <dt className="text-soft">Ruling</dt>
+            <dd className="m-0">{reachedVerdict ? <RulingTag ruling={trial.verdict.ruling} /> : "Waiting for the Judge"}</dd>
+            <dt className="text-soft">Court cost</dt>
+            <dd className="m-0">{usd(trial.costUsd)}{trial.mock ? " (mock run, no model calls)" : ""}</dd>
+            <dt className="text-soft">Models</dt>
+            <dd className="m-0">Prosecution {trial.prosecution.model}, defense {trial.defense.model}, judge {trial.judgeModel}</dd>
+          </dl>
+        </section>
       </div>
     </div>
   );
 }
 
-function EventCard({ event: e }: { event: Event }) {
+function EventCard({ event: e, delay }: { event: Event; delay?: number }) {
   return (
-    <li className="px-inset flex flex-col gap-1 p-3 text-sm">
+    <li className={`px-inset flex flex-col gap-1 p-3 text-sm ${delay === undefined ? "" : "pop"}`} style={delay ? { animationDelay: `${delay}ms` } : undefined}>
       <div className="flex justify-between gap-2">
         <span className="font-display">event {e.id}</span>
         <span>{e.testsPassing}/{e.testsTotal} tests · {usd(e.costUsd)}</span>
@@ -274,7 +287,7 @@ function EventCard({ event: e }: { event: Event }) {
 // The cited events, pinned to the courtroom wall while a line is spoken.
 function SceneEvidence({ events }: { events: Event[] }) {
   return (
-    <ul className="pointer-events-none absolute left-4 top-4 m-0 hidden w-[300px] list-none flex-col gap-2 p-0 lg:flex" aria-hidden>
+    <ul className="vn pointer-events-none absolute left-4 top-4 m-0 hidden w-[300px] list-none flex-col gap-2 p-0 lg:flex" aria-hidden>
       {events.map((e, i) => (
         <li key={e.id} className="pop border-4 border-shadow bg-panel px-3 py-2 text-sm shadow-[4px_4px_0_var(--shadow)]" style={{ animationDelay: `${i * 120}ms` }}>
           <div className="flex justify-between gap-2">
@@ -305,10 +318,23 @@ function CutIn({ line }: { line: Line }) {
   );
 }
 
-function VerdictStamp({ trial }: { trial: Trial }) {
+// The opening: "All rise" on a closed curtain, which parts onto the courtroom.
+function Curtain() {
+  return (
+    <div className="curtain pointer-events-none absolute inset-0 z-10 overflow-hidden" aria-hidden>
+      <div className="half l" />
+      <div className="half r" />
+      <div className="call absolute inset-0 flex items-center justify-center">
+        <span className="border-4 border-shadow bg-gold px-5 py-3 font-display text-[clamp(24px,4vw,44px)] leading-none text-[var(--on-accent)] shadow-[4px_4px_0_var(--shadow)]">All rise</span>
+      </div>
+    </div>
+  );
+}
+
+function VerdictStamp({ trial, late = false }: { trial: Trial; late?: boolean }) {
   return (
     <div className="pointer-events-none absolute inset-0 flex items-start justify-end p-4">
-      <div className="stamp border-4 border-shadow px-5 py-3 text-center" style={{ background: RULING_COLOR[trial.verdict.ruling], color: "var(--on-accent)", boxShadow: "4px 4px 0 var(--shadow)" }}>
+      <div className={`stamp border-4 border-shadow px-5 py-3 text-center ${late ? "late" : ""}`} style={{ background: RULING_COLOR[trial.verdict.ruling], color: "var(--on-accent)", boxShadow: "4px 4px 0 var(--shadow)" }}>
         <div className="font-display text-sm">Verdict</div>
         <div className="font-display text-[28px] leading-none sm:text-[40px]">{RULING_LABEL[trial.verdict.ruling]}</div>
       </div>
@@ -324,7 +350,7 @@ export const SUMMARY_REASON: Record<NonNullable<Trial["summary"]>, string> = {
 // Some charges are decided without a trial (court/src/rules.ts): a short card instead of the courtroom dialogue.
 function SummaryJudgment({ trial }: { trial: Trial }) {
   return (
-    <div className="stage flex flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <section className="px-box flex flex-wrap items-start gap-6 p-6">
         <div className="shrink-0 border-4 border-edge">
           <Portrait who="judge" mood="neutral" scale={3} />
@@ -355,7 +381,7 @@ function AfterVerdict({ trial, outcome, events }: { trial: Trial; outcome?: Work
   const after = Math.max(0, ...trial.charge.eventIds);
   const next = [...events.values()].filter((e) => e.id > after).sort((a, b) => a.id - b.id).slice(0, 4);
   return (
-    <section className="px-box flex flex-col gap-4 p-4" style={{ borderColor: RULING_COLOR[trial.verdict.ruling] }} aria-labelledby="after-h">
+    <section className="px-box pop flex flex-col gap-4 p-4" style={{ borderColor: RULING_COLOR[trial.verdict.ruling] }} aria-labelledby="after-h">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="after-h" className="text-[20px]">After the verdict</h2>
         {outcome ? <StatusTag state={outcome.state} /> : <span className="text-sm text-soft">{trial.workerId} is still running...</span>}

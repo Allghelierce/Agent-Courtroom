@@ -5,7 +5,7 @@ import { RulingChip, StateChip } from "@/components/Console";
 import { CHARGE_PHRASE, describeEvent, eventFailed, usd, type Event, type Trial } from "@/lib/data";
 import { useCaseContext } from "@/lib/case";
 
-// The Record view: the same case as the courtroom replay, as a plain audit record (ART.md, "Two modes").
+// The Record view: the same case as the courtroom, as a plain audit record for anyone checking the work (ART.md, "The Record view").
 
 const SIDES = [
   { key: "prosecution", label: "Prosecution", color: "var(--red)" },
@@ -27,7 +27,7 @@ export function CaseRecord({ trial }: { trial: Trial }) {
   const seconds = (Date.parse(trial.finishedAt) - Date.parse(trial.startedAt)) / 1000;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="console flex flex-col gap-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="Summary">
         <Fact label="Charge">
           <span className="font-medium">{trial.workerId} was charged with {CHARGE_PHRASE[trial.charge.kind]}.</span>
@@ -133,7 +133,7 @@ export function CaseRecord({ trial }: { trial: Trial }) {
       <section className="card flex flex-col gap-2 p-4" aria-labelledby="json-h">
         <div className="flex items-center justify-between gap-2">
           <h2 id="json-h" className="text-[15px]">Verdict sent to the worker</h2>
-          <Link href={`/court/${trial.id}`} className="btn">Replay this trial</Link>
+          <Link href={`/court/${trial.id}`} className="btn">Watch it in the courtroom</Link>
         </div>
         <pre className="m-0 whitespace-pre-wrap break-words rounded-md p-3 text-[12px] leading-relaxed" style={{ background: "var(--c-bg)", border: "1px solid var(--c-line)" }}>
           {JSON.stringify(trial.verdict, null, 2)}

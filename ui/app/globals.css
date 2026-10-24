@@ -4,7 +4,7 @@
 :root {
   /* The palette from the original anime-pixel mockup. */
   --bg: #0b0814;
-  --bg-check: #0e0a1a;
+  --bg-check: #120d21;
   --panel: #1b1430;
   --inset: #120c22;
   --edge: #3b2f57;
@@ -19,7 +19,7 @@
   --amber: #ffb347;
   --px: 4px;
 
-  /* Console (the serious side): flat, hairline borders, a plain sans. */
+  /* The Record view (a case's plain audit): flat, hairline borders, a plain sans. */
   --c-bg: #0c0a12;
   --c-panel: #14111d;
   --c-raise: #1c1828;
@@ -55,33 +55,51 @@
 
 html { color-scheme: dark; }
 
-/* Two modes (ART.md): the console is the default; anything inside .stage is the pixel-art courtroom. */
+/* Pixel chrome, readable data (ART.md): text and numbers are a clean sans; headings, buttons and tags are pixel;
+   the courtroom's dialogue (.vn) is the pixel text-box font. A case's Record tab is the one plain view (.console). */
 body {
   margin: 0;
-  color: var(--c-text);
+  color: var(--text);
   font-family: var(--font-plex), system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.5;
-  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
+  background-color: var(--bg);
+  /* Night sky over the checker: two star tiles of different sizes (so the repeat doesn't show), then hard-edged
+     scanlines, then the checker. All pixels sit on the 4px grid; nothing here moves. */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' shape-rendering='crispEdges'%3E%3Cg fill='%233b2f57'%3E%3Crect x='8' y='12' width='4' height='4'/%3E%3Crect x='68' y='36' width='4' height='4'/%3E%3Crect x='100' y='88' width='4' height='4'/%3E%3Crect x='32' y='104' width='4' height='4'/%3E%3Crect x='112' y='8' width='4' height='4'/%3E%3C/g%3E%3Crect x='44' y='60' width='4' height='4' fill='%23b9aed0' fill-opacity='.45'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='196' height='196' shape-rendering='crispEdges'%3E%3Cg fill='%233b2f57'%3E%3Crect x='140' y='36' width='4' height='12'/%3E%3Crect x='136' y='40' width='12' height='4'/%3E%3Crect x='24' y='148' width='4' height='12'/%3E%3Crect x='20' y='152' width='12' height='4'/%3E%3Crect x='88' y='120' width='4' height='4'/%3E%3Crect x='164' y='172' width='4' height='4'/%3E%3Crect x='52' y='20' width='4' height='4'/%3E%3C/g%3E%3Cg fill='%23b9aed0' fill-opacity='.55'%3E%3Crect x='140' y='40' width='4' height='4'/%3E%3Crect x='24' y='152' width='4' height='4'/%3E%3C/g%3E%3C/svg%3E"),
+    repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.22) 0 2px, transparent 2px 4px),
+    linear-gradient(45deg, var(--bg-check) 25%, transparent 25%, transparent 75%, var(--bg-check) 75%),
+    linear-gradient(45deg, var(--bg-check) 25%, transparent 25%, transparent 75%, var(--bg-check) 75%);
+  background-size: 128px 128px, 196px 196px, auto, 16px 16px, 16px 16px;
+  background-position: 0 0, 60px 92px, 0 0, 0 0, 8px 8px;
+  background-attachment: fixed, fixed, scroll, scroll, scroll;
 }
 
-h1, h2, h3 { font-weight: 600; margin: 0; line-height: 1.25; letter-spacing: -0.01em; }
+h1, h2, h3, .font-display { font-family: var(--font-pixelify), sans-serif; font-weight: 700; margin: 0; line-height: 1.2; }
 
-.stage {
-  color: var(--text);
+.vn {
   font-family: var(--font-dotgothic), sans-serif;
-  font-size: 16px;
   -webkit-font-smoothing: none;
 }
-.stage h1, .stage h2, .stage h3, .font-display { font-family: var(--font-pixelify), sans-serif; font-weight: 700; letter-spacing: 0; }
+
+.console {
+  color: var(--c-text);
+  font-family: var(--font-plex), system-ui, sans-serif;
+  font-size: 15px;
+  -webkit-font-smoothing: auto;
+  font-variant-numeric: tabular-nums;
+}
+.console h1, .console h2, .console h3 { font-family: inherit; font-weight: 600; line-height: 1.25; letter-spacing: -0.01em; }
 
 a { color: inherit; }
 
-:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-.stage :focus-visible { outline-width: var(--px); outline-offset: var(--px); }
+:focus-visible { outline: var(--px) solid var(--gold); outline-offset: var(--px); }
+.console :focus-visible { outline-width: 2px; outline-offset: 2px; }
 
-/* ---------- console ---------- */
+/* ---------- the Record view (.console) ---------- */
 .card { background: var(--c-panel); border: 1px solid var(--c-line); border-radius: 8px; }
 .btn {
   display: inline-flex; align-items: center; gap: 6px;
@@ -145,6 +163,14 @@ canvas.pixelated { image-rendering: pixelated; image-rendering: crisp-edges; dis
 .px-btn:active, .px-btn[aria-pressed="true"] { transform: translateY(var(--px)); box-shadow: 0 0 0 0 #7a5a14; }
 .px-btn.ghost { background: var(--inset); color: var(--text); border-color: var(--edge); box-shadow: 0 var(--px) 0 0 var(--shadow); }
 .px-btn.red { background: var(--red); box-shadow: 0 var(--px) 0 0 #5a1426; }
+.px-btn.sm { font-size: 13px; padding: 8px 10px; gap: 6px; }
+
+/* Data tables inside a .px-box: pixel rules between rows, plain readable cells. */
+table.px-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.px-table th { text-align: left; font-weight: 500; font-size: 13px; color: var(--soft); padding: 12px; border-bottom: var(--px) solid var(--edge); white-space: nowrap; }
+.px-table td { padding: 12px; border-bottom: 2px solid var(--edge); vertical-align: middle; }
+.px-table tbody tr:last-child td { border-bottom: 0; }
+.px-table tbody tr:hover { background: var(--inset); }
 
 .px-tag {
   display: inline-flex;
@@ -224,7 +250,36 @@ canvas.pixelated { image-rendering: pixelated; image-rendering: crisp-edges; dis
 .pulse-step { animation: pulse-step 1.2s steps(2) infinite; }
 @keyframes pulse-step { 50% { filter: brightness(1.15); } }
 
+/* The courtroom opening: two curtain halves part after "All rise". */
+.curtain { animation: curtain-hide 1.4s steps(1) forwards; }
+.curtain > .half { position: absolute; top: 0; bottom: 0; width: 50.5%; background: repeating-linear-gradient(90deg, var(--panel) 0 24px, var(--inset) 24px 32px); border-color: var(--shadow); }
+.curtain > .half.l { left: 0; border-right: var(--px) solid; animation: curtain-l 1.3s steps(8) forwards; }
+.curtain > .half.r { right: 0; border-left: var(--px) solid; animation: curtain-r 1.3s steps(8) forwards; }
+.curtain > .call { animation: curtain-call 1.3s steps(2) forwards; }
+@keyframes curtain-l { 0%, 45% { transform: translateX(0); } 100% { transform: translateX(-101%); } }
+@keyframes curtain-r { 0%, 45% { transform: translateX(0); } 100% { transform: translateX(101%); } }
+@keyframes curtain-call { 0%, 40% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes curtain-hide { to { visibility: hidden; } }
+
+/* The speaker's name tag slaps on; their portrait bounces while they talk. */
+.tag-in { animation: tag-in 0.2s steps(3) both; }
+@keyframes tag-in {
+  from { transform: rotate(-6deg) scale(0.4); opacity: 0; }
+  to { transform: rotate(0) scale(1); opacity: 1; }
+}
+.talk { animation: talk 0.25s steps(2) infinite; }
+@keyframes talk { 50% { transform: translateY(calc(-1 * var(--px))); } }
+
+/* The verdict lands after the cut-in clears: a white flash, then the stamp. */
+.late { animation-delay: 1.05s; animation-fill-mode: both; }
+.flash { background: #ffffff; opacity: 0; animation: flash 0.3s steps(3) forwards; }
+.flash.late { animation-fill-mode: forwards; }
+@keyframes flash { from { opacity: 0.85; } to { opacity: 0; } }
+
 @media (prefers-reduced-motion: reduce) {
+  .curtain { display: none; }
+  .tag-in, .talk, .flash { animation: none; }
+  .flash { display: none; }
   .burst.show { animation: none; transform: translate(-50%, -50%) rotate(-6deg) scale(1); }
   .stamp { animation: none; transform: rotate(-4deg); opacity: 1; }
   .shake, .blink, .pulse-step, .cutin-lines, .pulse-soft { animation: none; }

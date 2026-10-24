@@ -1,4 +1,5 @@
-import { STATE_COLOR, STATE_LABEL } from "@/lib/data";
+import type { ChargeKind, Ruling } from "@court/types";
+import { KIND_LABEL, RULING_COLOR, RULING_LABEL, STATE_COLOR, STATE_LABEL } from "@/lib/data";
 import type { WorkerState } from "@/lib/stream";
 
 export function StatusTag({ state }: { state: WorkerState }) {
@@ -6,6 +7,54 @@ export function StatusTag({ state }: { state: WorkerState }) {
     <span className={`px-tag ${state === "on_trial" ? "pulse-step" : ""}`} style={{ background: STATE_COLOR[state], color: "var(--on-accent)" }}>
       {STATE_LABEL[state]}
     </span>
+  );
+}
+
+export function RulingTag({ ruling }: { ruling: Ruling }) {
+  return (
+    <span className="px-tag" style={{ background: RULING_COLOR[ruling], color: "var(--on-accent)" }}>
+      {RULING_LABEL[ruling]}
+    </span>
+  );
+}
+
+// Segmented meter: one cell per unit, never a smooth bar (ART.md, "Shapes and surfaces").
+export function Meter({ value, max, cells = max, color, label }: { value: number; max: number; cells?: number; color: string; label: string }) {
+  const filled = max > 0 ? Math.round((Math.min(value, max) / max) * cells) : 0;
+  return (
+    <div role="meter" aria-label={label} aria-valuenow={value} aria-valuemin={0} aria-valuemax={max} className="flex gap-1">
+      {Array.from({ length: cells }, (_, i) => (
+        <span key={i} className="h-3 flex-1 border-2 border-edge" style={{ background: i < filled ? color : "var(--inset)" }} />
+      ))}
+    </div>
+  );
+}
+
+const LIGHTS: { kind: ChargeKind; color: string }[] = [
+  { kind: "looping", color: "var(--red)" },
+  { kind: "stalling", color: "var(--gold)" },
+  { kind: "overspending", color: "var(--red)" },
+  { kind: "flailing", color: "var(--gold)" },
+];
+
+export function WarningLights({ lit }: { lit: ChargeKind[] }) {
+  return (
+    <ul className="grid grid-cols-2 gap-2" aria-label="Warning lights">
+      {LIGHTS.map(({ kind, color }) => {
+        const on = lit.includes(kind);
+        return (
+          <li key={kind} className="flex items-center gap-2 text-sm" style={{ color: on ? "var(--text)" : "var(--soft)" }}>
+            <span
+              aria-hidden
+              className="inline-block size-3 border-2 border-edge"
+              style={on ? { background: color, boxShadow: `0 0 0 4px color-mix(in srgb, ${color} 40%, transparent)` } : undefined}
+            />
+            {KIND_LABEL[kind]}
+            <span className="sr-only">{on ? "(lit)" : "(off)"}</span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

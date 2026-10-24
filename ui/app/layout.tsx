@@ -22,7 +22,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <SiteHeader />
         </Suspense>
         <LiveProvider>
-          <main className="mx-auto w-full max-w-[1280px] px-4 pb-16">{children}</main>
+          <main className="mx-auto w-full max-w-[1200px] px-4 pb-16">{children}</main>
         </LiveProvider>
       </body>
     </html>

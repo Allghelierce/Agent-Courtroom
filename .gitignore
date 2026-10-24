@@ -1,1 +1,5 @@
 .superpowers/
+__pycache__/
+*.pyc
+engine/.venv/
+runs/

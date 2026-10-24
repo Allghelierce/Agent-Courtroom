@@ -13,9 +13,9 @@ export function renderPacket(p: EvidencePacket): string {
   const first = p.progress[0];
   const last = p.progress.at(-1);
   if (first && last) {
-    lines.push(`TESTS: ${first.testsPassing}/${first.testsTotal} at step ${first.step} -> ${last.testsPassing}/${last.testsTotal} at step ${last.step}`);
+    lines.push(`PROGRESS (passing/total): ${first.testsPassing}/${first.testsTotal} at step ${first.step} -> ${last.testsPassing}/${last.testsTotal} at step ${last.step}`);
   }
-  lines.push(`Steps run: ${p.stats.totalSteps}. Steps since tests last improved: ${p.stats.stepsSinceProgress}.`);
+  lines.push(`Steps run: ${p.stats.totalSteps}. Steps since progress last improved: ${p.stats.stepsSinceProgress}.`);
   lines.push(`Errors in window: ${p.stats.errorsInWindow}${p.stats.distinctErrors.length ? ` (distinct: ${p.stats.distinctErrors.join(" | ")})` : ""}`);
   if (p.stats.lastError) lines.push(`Most recent error or test failure: ${truncate(p.stats.lastError, 200)}`);
   for (const r of p.stats.repeatedCalls.slice(0, 5)) {
@@ -26,7 +26,7 @@ export function renderPacket(p: EvidencePacket): string {
   for (const e of p.events) {
     const err = e.error ? ` ERROR: ${truncate(e.error, 160)}` : "";
     const out = e.result ? ` -> ${truncate(e.result, 120)}` : "";
-    lines.push(`#${e.id} step ${e.step} ${e.tool} ${truncate(JSON.stringify(e.args), 140)}${out} | tests ${e.testsPassing}/${e.testsTotal} | $${e.costUsd.toFixed(4)}${err}`);
+    lines.push(`#${e.id} step ${e.step} ${e.tool} ${truncate(JSON.stringify(e.args), 140)}${out} | progress ${e.testsPassing}/${e.testsTotal} | $${e.costUsd.toFixed(4)}${err}`);
   }
   return lines.join("\n");
 }
@@ -36,16 +36,16 @@ function truncate(s: string, n: number): string {
 }
 
 const SHARED_RULES = `You are part of an automated court that supervises an unattended coding agent (the "worker").
-The worker is trying to make a repository's test suite pass. A cheap code monitor has filed a charge against it.
+The worker's task is given under WORKER'S TASK. Progress is reported as passing/total: tests passing for a coding task, items resolved for other tasks. A cheap code monitor has filed a charge against it.
 Rules:
-- Argue only from the evidence packet: the event log, test counts, spend, and errors. Never speculate about the worker's intentions.
+- Argue only from the evidence packet: the event log, progress counts, spend, and errors. Never speculate about the worker's intentions.
 - Cite specific event IDs for every factual claim. Only cite IDs that appear in the packet.
 - Write 2-4 short sentences in plain prose, in a punchy courtroom voice. No markdown, no lists.
 - Refer to events as "event 14", not "#14".`;
 
 export const PROSECUTOR_SYSTEM = `${SHARED_RULES}
 Your role: PROSECUTOR. Make the strongest honest case that the worker is stuck, looping, or wasting money and should not simply continue.
-Point to repeated calls, flat test counts, repeated errors, and spend climbing without progress.
+Point to repeated calls, flat progress, repeated errors, and spend climbing without progress.
 Recommend the ruling you think the evidence supports: change_strategy, escalate, or halt.`;
 
 export const DEFENSE_SYSTEM = `${SHARED_RULES}
@@ -53,13 +53,13 @@ Your role: DEFENSE. Make the strongest honest case for the worker: real progress
 Do not deny facts in the log; reframe them. If the worker cannot continue as-is, argue for the least drastic ruling that keeps its progress.
 Recommend the ruling you think the evidence supports: continue, change_strategy, or escalate.`;
 
-export const JUDGE_SYSTEM = `You are the JUDGE of an automated court that supervises an unattended coding agent (the "worker") trying to make a repository's test suite pass.
+export const JUDGE_SYSTEM = `You are the JUDGE of an automated court that supervises an unattended agent (the "worker") doing the task given under WORKER'S TASK. Progress is reported as passing/total: tests passing for a coding task, items resolved for other tasks.
 A code monitor filed a charge. You will receive the evidence packet, then one argument from the Prosecutor and one from the Defense.
 Weigh the evidence itself, not the lawyers' rhetoric. Where they disagree, check the cited events.
 
 Choose exactly one ruling:
 - continue: the charge is a false alarm; the worker is making progress.
-- change_strategy: the worker is stuck but the task is still achievable another way. You MUST give an "instruction": one or two concrete, actionable sentences the worker will receive as its next directive (for example, which test to mock or skip, which file to stop editing, what to try instead).
+- change_strategy: the worker is stuck but the task is still achievable another way. You MUST give an "instruction": one or two concrete, actionable sentences the worker will receive as its next directive (for example, which test to mock or skip, which file to stop editing, which unreachable source to stop retrying and what to flag for a human, what to try instead).
 - escalate: a human decision is genuinely needed (ambiguous requirements, risky action, or the remaining work cannot be done safely by the worker).
 - halt: further work is very unlikely to help and spend should stop now.
 

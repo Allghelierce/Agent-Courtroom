@@ -5,3 +5,5 @@ export type { CourtOptions } from "./court.ts";
 export { renderPacket } from "./prompts.ts";
 export { saveTrial, listTrials } from "./caselog.ts";
 export { findPrecedents, renderPrecedents } from "./precedent.ts";
+export { rulesConfig, summaryJudgment } from "./rules.ts";
+export type { RulesConfig, Summary, SummaryKind } from "./rules.ts";

@@ -75,11 +75,11 @@ def main():
                 results.append(result)
                 (out / "runs.json").write_text(json.dumps(results, indent=2) + "\n")
                 print(f"{task} pair {repetition + 1}: {result['withCourt']['state']} / {result['withoutCourt']['state']} ({result['costMode']})", flush=True)
-                # The court quietly runs its $0 mock without an Anthropic key; that would fake the savings.
+                # The court quietly runs its $0 mock without a model key; that would fake the savings.
                 fake = set(result["withCourt"]["courtModes"]) & {"mock", "stub"}
                 if args.brain != "scripted" and fake:
                     sys.exit(f"Court ran in {'/'.join(sorted(fake))} mode, so its cost isn't real. Restart it with "
-                             f"ANTHROPIC_API_KEY set and COURT_MOCK unset. Partial results: {out}")
+                             f"ANTHROPIC_API_KEY or GROQ_API_KEY set and COURT_MOCK unset. Partial results: {out}")
     finally:
         bus.close()
     rows = []

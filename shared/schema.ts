@@ -46,6 +46,7 @@ export type EvidencePacket = {
   testProgress: { step: number; testsPassing: number; testsTotal: number }[];
   spend: { costUsd: number; budgetUsd: number };
   task: string; // what the worker was asked to do
+  workerStartedAt?: string; // WorkerStatus.startedAt; scopes the court's history to this run
 };
 
 // --- Event stream (GET /stream, Server-Sent Events) ---

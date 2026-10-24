@@ -172,9 +172,9 @@ class Engine:
             "budgetUsd": cfg.budget_usd,
             "maxSteps": cfg.max_steps,
             "costMode": "simulated" if cfg.brain == "scripted" else "estimated_from_usage",
-            # The court always prices with Claude rates; the worker's come from its own model's provider.
-            "pricingDate": PRICES["providers"]["claude"]["verifiedAt"],
-            "pricingSource": PRICES["providers"]["claude"]["source"],
+            # The court prices its own trials (Claude or Groq) from the same table.
+            "pricingDate": PRICES["verifiedAt"],
+            "pricingSources": {name: p["source"] for name, p in PRICES["providers"].items()},
             "workerPricingDate": pricing_info(model)["verifiedAt"],
             "workerPricingSource": pricing_info(model)["source"],
             "successCriteria": "pending human definition; state is engine-reported test completion only",

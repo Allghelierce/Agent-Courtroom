@@ -1,56 +1,76 @@
 # Plugging into the court
 
-For Person A (engine) and Person C (event server and demo). The court is a small HTTP service: send it a charge with evidence, and it holds a trial and returns a verdict. Details are in [README.md](README.md). Types are in `src/types.ts`, which mirrors `shared/schema.ts`.
+For Person A (engine) and Person C (event server and demo). The court is a small HTTP service: send it a charge with evidence, and it holds a trial and returns a verdict. Details are in [README.md](README.md). Shared types are in `shared/schema.ts`. The court's copy is `src/types.ts`.
 
 ## 1. Start the court
 
 ```bash
 cd court && npm install
 COURT_MOCK=1 npm run serve     # mock court: deterministic, no model calls, free
-npm run serve                  # real court: needs ANTHROPIC_API_KEY
+npm run serve                  # real court: Anthropic if its key is set, else Groq, else mock
 ```
+
+**Provider:** the court uses Anthropic when `ANTHROPIC_API_KEY` is set, otherwise Groq when `GROQ_API_KEY` is set, otherwise the mock. `trial.mock` says whether a model ran, and `trial.judgeModel` says which one.
+
+| Provider | Lawyers (Prosecutor, Defense) | Judge |
+|---|---|---|
+| Anthropic | `claude-haiku-5-5` | `claude-opus-5-5` |
+| Groq | `openai/gpt-oss-20b` | `openai/gpt-oss-120b` |
 
 | Env var | Default | What it does |
 |---|---|---|
-| `COURT_PORT` | `4100` | Port to listen on. |
-| `ANTHROPIC_API_KEY` | none | Without it, the court runs the mock. |
+| `ANTHROPIC_API_KEY` | none | Use Anthropic models. |
+| `GROQ_API_KEY` | none | Use Groq models when there is no Anthropic key. |
+| `COURT_PROVIDER` | auto | `anthropic` or `groq` forces one provider. |
 | `COURT_MOCK` | unset | `1` forces the mock even when a key is set. |
-| `COURT_LAWYER_MODEL` | `claude-haiku-5-5` | Model for the Prosecutor and Defense. |
-| `COURT_JUDGE_MODEL` | `claude-opus-5-5` | Model for the Judge. |
+| `COURT_LAWYER_MODEL` / `COURT_JUDGE_MODEL` | per provider (above) | Override the models. |
+| `COURT_DEADLINE_MS` | `50000` | Time limit for a whole trial. The engine's `HttpCourt` gives up at 60s, so keep this below that. |
+| `COURT_PORT` | `4100` | Port to listen on. |
+| `COURT_HOST` | `127.0.0.1` | Interface to bind. Set `0.0.0.0` to accept connections from other machines. |
+| `COURT_CASES_DIR` | `court/cases/` | Where trials are saved, and where precedent is read from. |
 
-`GET /health` returns `{"ok":true}`. CORS is open. Every trial is saved to `court/cases/<id>.json`. `trial.mock` says whether the mock or the real models ran.
+`GET /health` returns `{"ok":true}`. CORS is open. Every trial is saved to `<COURT_CASES_DIR>/<id>.json`.
 
 ## 2. Engine → court: `POST /verdict`
 
-Send the engine's `EvidencePacket` from `shared/schema.ts`:
+Run the engine with `--court http://localhost:4100/verdict`. It POSTs its `EvidencePacket` from `shared/schema.ts`:
 
 ```json
 { "charge": {...}, "events": [...], "testProgress": [{"step": 1, "testsPassing": 3, "testsTotal": 12}],
   "spend": {"costUsd": 0.31, "budgetUsd": 1.0}, "task": "Make the failing test suite pass" }
 ```
 
-The response body is a bare `Verdict`. The saved trial's ID comes back in the `X-Case-Id` header, and the IDs of any earlier trials shown to the Judge as precedent come back comma-separated in `X-Precedents`. Both routes feed the whole case log to the Judge as precedent. A missing or mistyped field returns `400 {"error": "..."}`.
+The response body is a bare `Verdict`. Headers:
+- `X-Case-Id`: the saved trial's ID.
+- `X-Precedents`: comma-separated IDs of earlier trials shown to the Judge as precedent.
 
-**From Python,** copy `clients/python/court_client.py` into the engine. It uses only the standard library.
+A missing or mistyped field returns `400 {"error": "..."}`.
 
-```python
-from court_client import convene
-verdict = convene(packet, url="http://localhost:4100", timeout=60)  # dict, or dataclasses with .to_json()
-verdict["ruling"], verdict.get("instruction"), verdict["caseId"]
-```
+**What the engine does with the response** (`engine/courtroom_engine/court.py`, `HttpCourt`):
+- It checks that the verdict only cites events in the packet.
+- It fetches `GET /cases/<X-Case-Id>`, checks the trial's ID, worker, `charge.id` and cost, and adds `trial.costUsd` to `WorkerStatus.courtCostUsd`.
+- If there's no usable verdict (court down, timeout, bad response), it rules `escalate`. A worker never hangs on a dead court, and a broken court never lets a stuck worker keep spending.
+- If the verdict is fine but the trial fetch fails, the verdict still applies, and the court cost is marked incomplete.
 
-**`convene()` never raises.** If the court is down, times out, returns a non-200, or sends back an invalid verdict (including `change_strategy` with no instruction), it returns `escalate` with `reasoning: "Court unreachable: <why>"` and `caseId: None`. A worker never hangs on a dead court, and a broken court never lets a stuck worker keep spending.
+**Other Python callers** can use `clients/python/court_client.py`, a standard-library-only client with the same never-raises, escalate-on-failure behavior. It returns the verdict plus `caseId`.
 
 ## 3. What each ruling means for the engine
 
 | `ruling` | Engine does |
 |---|---|
 | `continue` | Resume the worker unchanged. The charge was a false alarm. |
-| `change_strategy` | Resume, and add `instruction` to the worker's **next** prompt, e.g. `Court ruling: <instruction>`. `instruction` is always present for this ruling. |
-| `escalate` | Pause and set the worker's state to `awaiting_human`. Resume when a human posts a Verdict to `POST /workers/:workerId/resolve` (Person C's server). |
+| `change_strategy` | Resume, and put `instruction` in the worker's next prompt as a `COURT ORDER`. `instruction` is always present for this ruling. |
+| `escalate` | Set the state to `awaiting_human` and wait (up to 10 minutes) for a human Verdict at `POST /workers/:workerId/resolve`. |
 | `halt` | Stop the run, set the state to `halted`, and use `reasoning` as the summary. |
 
-While the court deliberates, the worker's state is `on_trial`. With the real models, a trial takes several seconds, so keep `timeout` at 60.
+While the court deliberates, the worker's state is `on_trial`. If a trial hits `COURT_DEADLINE_MS`, the unfinished steps fall back safely: a lawyer who runs out of time rests, and a Judge who can't rule gives `escalate`.
+
+**Summary judgment (no trial).** For repeat offenders and over-budget workers, the court rules in plain code before calling any model (see "Summary judgment" in [README.md](README.md)). What the engine sees:
+- **The verdict comes back as usual,** but it's always `escalate` or `halt`. It's `escalate` when a worker is charged again soon after a `change_strategy` ruling, or when the court's spend or trial count on that worker hits its limit. It's `halt` when the worker is charged again after that escalation. It returns almost instantly.
+- **`X-Case-Id` still points to a saved trial at `/cases/<id>`,** with `costUsd: 0`, `summary` (`repeat_offender` or `court_budget`), and `priorCaseIds`. The engine's cost check accepts it, and `courtCostUsd` doesn't change.
+- **`workerStartedAt`** (the worker's `WorkerStatus.startedAt`) is in every packet the engine sends (`build_packet`, declared in `shared/schema.ts`). Worker IDs repeat across `run`/`compare` invocations, so the court uses it to count only trials from the current run. A caller that leaves it out gets the court's fallback: the oldest event in the packet, which can miss earlier trials in the same run.
+
+**The court doesn't care what the task is.** The engine runs `coding` (fix a failing repo) and `prices` (collect product prices from mock store pages) workers. Either way, progress goes in `testsPassing` / `testsTotal`: tests passing for coding, products resolved for prices. The court reasons over those numbers, so a new task type needs no court changes.
 
 ## 4. UI → court
 
@@ -64,21 +84,22 @@ While the court deliberates, the worker's state is `on_trial`. With the real mod
 
 ```ts
 { id, workerId, charge,
-  prosecution: { side, model, argument, cited_events, costUsd },
-  defense:     { side, model, argument, cited_events, costUsd },
+  prosecution: { side, model, argument, cited_events, costUsd, costComplete? },
+  defense:     { side, model, argument, cited_events, costUsd, costComplete? },
   verdict, judgeModel, costUsd, startedAt, finishedAt, mock,
-  precedents?: string[] }   // ids of earlier trials shown to the Judge
+  costComplete?,          // false if any model call had no price
+  pricingDate?,           // when shared/model-prices.json was last verified
+  precedents?: string[] } // ids of earlier trials shown to the Judge
 ```
 
-## 5. Person C: getting trials into the event stream
+## 5. Person C: trials in the event stream and costs
 
-- After `POST /verdict` returns, the engine (or your server) publishes the existing stream message: `{ type: "verdict", data: { workerId, chargeId, verdict } }`.
-- The full trial (both arguments, models, and cost) is at `GET /cases/<X-Case-Id>`. The Python client returns it as `verdict["caseId"]`.
-- Suggestion: add an optional `caseId` to the `verdict` stream message, so the UI can open the courtroom scene without matching on `chargeId`.
-- `trial.costUsd` is the court's own spend. Use it for the "the court is cheap" number in the comparison.
+- After a verdict, the stream carries `{ type: "verdict", data: { workerId, chargeId, verdict, caseId? } }`. Use `caseId` to fetch the full trial at `GET /cases/<caseId>` for the courtroom scene.
+- **Pricing** comes from `shared/model-prices.json` (USD per million tokens, Anthropic and Groq models). The court and the engine read the same file.
+- `trial.costUsd` is the court's own spend. The engine adds it to `WorkerStatus.courtCostUsd`, so the comparison can show worker cost, court cost and total cost separately. If `costComplete` is `false`, a model had no listed price, so show the total as unknown rather than as a low number.
 
 ## 6. Known gaps
 
-- **The real-model path is untested end to end** without an API key. The tests cover it with a fake client, and `npm run eval` (`scripts/eval.ts`) runs the real court on every fixture once a key is set.
-- **`Charge.id` is optional here** but required in `shared/schema.ts`. Send it anyway, because the `verdict` stream message needs `chargeId`.
-- **`court/src/types.ts` mirrors `shared/schema.ts`** until that file lands on the `Tristan` branch. Then the court will import it directly.
+- **The real-model path is lightly tested.** The tests use fake Anthropic and Groq clients. `npm run eval` (`scripts/eval.ts`) runs the real court on every fixture once a key is set, showing a cost estimate first.
+- **`Charge.id` is optional in the court's types** but required in `shared/schema.ts`, and the engine checks it when it fetches the trial. Always send it.
+- **`court/src/types.ts` is still a hand-kept copy of `shared/schema.ts`.** The shared file is on this branch now, so switching the court to import it directly is a small follow-up.

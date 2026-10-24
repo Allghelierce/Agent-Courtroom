@@ -21,6 +21,7 @@ const INK = "#120c22";
 export function CourtScene({ speaker, moods = {}, swirl = false, gavelDown = false, workerLabel = "a worker", maxScale = 6 }: Props) {
   // Static layers and sprites are built once per mood on the client and reused every frame.
   const cache = useRef(new Map<string, HTMLCanvasElement>());
+  const gavelHit = useRef<number | null>(null); // the tick the gavel came down, for its sparks
   const layer = (key: string, make: () => { toCanvas(): HTMLCanvasElement }) => {
     let cv = cache.current.get(key);
     if (!cv) {
@@ -57,6 +58,16 @@ export function CourtScene({ speaker, moods = {}, swirl = false, gavelDown = fal
       ctx.drawImage(layer("bench", sceneBench), 0, 0);
       const up = speaker === "judge" && !gavelDown && tick % 6 < 3;
       ctx.drawImage(layer(up ? "gavel-up" : "gavel-down", () => gavel(up)), 150, 36);
+
+      // sparks flying off the bench for half a second after the gavel lands
+      if (!gavelDown) gavelHit.current = null;
+      else if (gavelHit.current === null || tick < gavelHit.current) gavelHit.current = tick;
+      const since = gavelDown && gavelHit.current !== null ? tick - gavelHit.current : -1;
+      if (since >= 0 && since < 6) {
+        const d = 2 + since * 2;
+        ctx.fillStyle = since < 3 ? "#ffffff" : GOLD;
+        for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 0], [1, 0], [0, -1]]) ctx.fillRect(154 + dx * d, 40 + dy * d, 2, 2);
+      }
       actor("pros");
       actor("def");
       actor("worker");

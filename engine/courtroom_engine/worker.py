@@ -206,7 +206,7 @@ class Worker:
             return None  # without a court the warning light flashes and nobody acts
 
         self._set_state("on_trial")
-        verdict = self.court.convene(build_packet(charge, self.events, self.budget_usd, self.task.prompt))
+        verdict = self.court.convene(build_packet(charge, self.events, self.budget_usd, self.task.prompt, self.status.startedAt))
         trial = getattr(self.court, "last_trial", None)
         case_id = getattr(self.court, "last_case_id", None)
         if trial:

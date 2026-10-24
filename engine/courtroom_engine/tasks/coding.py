@@ -14,6 +14,27 @@ from .base import Script, Task, ToolOutcome
 
 TEST_LINE = re.compile(r"^(\w+) \(.+?\) \.\.\. (ok|FAIL|ERROR|skipped.*|expected failure|unexpected success)$")
 RAN_LINE = re.compile(r"^Ran (\d+) tests?")
+FAILURE_HEADER = re.compile(r"^(?:FAIL|ERROR): (\w+)")
+SEPARATOR = re.compile(r"^(?:=+|-+)$")
+
+
+def first_failure(output: str) -> str:
+    """The exception line of the first failing test's traceback, e.g.
+    "URLError: <urlopen error [Errno 61] Connection refused>". The court and the monitors only
+    see the one-line summary, so without this an unreachable dependency looks like any failure."""
+    lines = output.splitlines()
+    for i, line in enumerate(lines):
+        if FAILURE_HEADER.match(line):
+            body = []
+            for later in lines[i + 2:]:  # skip the dashed line under the header
+                if SEPARATOR.match(later) or later.startswith("Ran "):
+                    break
+                body.append(later)
+            last = next((b.strip() for b in reversed(body) if b.strip()), "")
+            # "urllib.error.URLError: ..." -> "URLError: ..."
+            last = re.sub(r"^(?:[A-Za-z_]\w*\.)+(\w+(?:Error|Exception|Failure|Exit)\b)", r"\1", last)
+            return last[:200]
+    return ""
 
 
 class CodingEnv:
@@ -99,6 +120,8 @@ class CodingEnv:
         summary = f"{passing}/{total} passing"
         if failing:
             summary += "; failing: " + ", ".join(sorted(failing))
+            if cause := first_failure(output):
+                summary += f" — {cause}"
         # The worker sees the tail, where the tracebacks and totals are.
         return ToolOutcome(output=output[-6000:], summary=summary, progress=(passing, total))
 

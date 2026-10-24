@@ -18,7 +18,7 @@ from .schema import Charge, Event, Verdict
 PACKET_EVENTS = 20
 
 
-def build_packet(charge: Charge, events: list[Event], budget_usd: float, task: str) -> dict[str, Any]:
+def build_packet(charge: Charge, events: list[Event], budget_usd: float, task: str, started_at: str | None = None) -> dict[str, Any]:
     mine = [e for e in events if e.workerId == charge.workerId]
     return {
         "charge": charge.to_json(),
@@ -28,6 +28,9 @@ def build_packet(charge: Charge, events: list[Event], budget_usd: float, task: s
         ],
         "spend": {"costUsd": round(sum(e.costUsd for e in mine), 6), "budgetUsd": budget_usd},
         "task": task,
+        # Worker IDs restart with each engine run, so the court uses this to keep its
+        # repeat-offender and budget history to the current run.
+        **({"workerStartedAt": started_at} if started_at else {}),
     }
 
 

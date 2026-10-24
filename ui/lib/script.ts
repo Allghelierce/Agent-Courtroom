@@ -1,6 +1,7 @@
 import type { ChargeKind, Ruling, Trial } from "@court/types";
-import { KIND_LABEL, RULING_LABEL } from "./data";
+import { CHARGE_PHRASE, RULING_LABEL } from "./data";
 import type { CastKey, Mood } from "./sprites";
+import type { WorkerStatus } from "./stream";
 
 export type Line = {
   who: CastKey;
@@ -32,17 +33,27 @@ function sentence(s: string): string {
   return /[.!?]$/.test(t) ? t : `${t}.`;
 }
 
-export function buildScript(trial: Trial): Line[] {
+// The worker's last line reports how its run actually ended, when we know.
+function reactionFor(ruling: Ruling, outcome?: WorkerStatus): { mood: Mood; text: string } {
+  const base = WORKER_REACTION[ruling];
+  if (outcome?.state !== "succeeded") return base;
+  const tests = `${outcome.testsPassing} of ${outcome.testsTotal} tests passing now!`;
+  if (ruling === "change_strategy") return { mood: "happy", text: `Understood! New strategy... and ${tests}` };
+  if (ruling === "continue") return { mood: "happy", text: `Thank you, Your Honor! Back to work... and ${tests}` };
+  return base;
+}
+
+export function buildScript(trial: Trial, outcome?: WorkerStatus): Line[] {
   const kind = trial.charge.kind;
   const stuck: Mood = kind === "looping" ? "dizzy" : "worried";
-  const reaction = WORKER_REACTION[trial.verdict.ruling];
+  const reaction = reactionFor(trial.verdict.ruling, outcome);
   const ruling = `The court rules: ${RULING_LABEL[trial.verdict.ruling].toLowerCase()}!${trial.verdict.instruction ? ` ${trial.verdict.instruction}` : ""}`;
 
   return [
     {
       who: "clerk",
       mood: "neutral",
-      text: `Court is now in session. ${trial.workerId} stands charged with ${KIND_LABEL[kind].toLowerCase()}. ${sentence(trial.charge.summary)}`,
+      text: `Court is now in session. ${trial.workerId} stands charged with ${CHARGE_PHRASE[kind]}. ${sentence(trial.charge.summary)}`,
       cites: trial.charge.eventIds,
       moods: { worker: stuck },
     },

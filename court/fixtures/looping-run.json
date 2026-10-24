@@ -50,7 +50,9 @@
       "workerId": "worker-03",
       "step": 4,
       "tool": "run_tests",
-      "args": {},
+      "args": {
+        "path": "tests/convert.test.ts"
+      },
       "tokens": 4700,
       "costUsd": 0.0141,
       "testsPassing": 6,
@@ -94,7 +96,9 @@
       "workerId": "worker-03",
       "step": 7,
       "tool": "run_tests",
-      "args": {},
+      "args": {
+        "path": "tests/rounding.test.ts"
+      },
       "tokens": 5900,
       "costUsd": 0.0177,
       "testsPassing": 8,
@@ -183,7 +187,9 @@
       "workerId": "worker-03",
       "step": 13,
       "tool": "run_tests",
-      "args": {},
+      "args": {
+        "path": "tests/rates.test.ts"
+      },
       "tokens": 8300,
       "costUsd": 0.0249,
       "testsPassing": 11,
@@ -212,7 +218,9 @@
       "workerId": "worker-03",
       "step": 15,
       "tool": "run_tests",
-      "args": {},
+      "args": {
+        "path": "tests/rates.test.ts"
+      },
       "tokens": 9100,
       "costUsd": 0.0273,
       "testsPassing": 11,

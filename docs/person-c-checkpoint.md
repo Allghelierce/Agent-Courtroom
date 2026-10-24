@@ -18,23 +18,30 @@ under a unique `runs/smoke/` directory.
 
 ## Still to verify
 
-- Dashboard production build and browser walkthrough. In this agent environment,
-  Turbopack fails while processing CSS because its worker cannot bind a local port
-  (`Operation not permitted`). TypeScript passes; this does not establish browser behavior.
-  Try `cd ui && npm run build` in your terminal and record any remaining error.
+- Chris completed the mock-demo browser walkthrough: live connection, case list,
+  trial replay, comparison table, and restart recovery. Before/after screenshots
+  retained 14 workers, 308 steps, and 10 trials with no visible duplicates.
+  This verifies that tested version; the latest merged UI changes have not been
+  rechecked in the browser. The production build remains unverified here.
 - Real Groq/Claude calls and paid court behavior have not been exercised in this checkpoint.
-- Recovery is the chosen success criterion; the independent verification method
-  remains to be decided in [decisions.md](decisions.md). Scripted completion is integration
+- Recovery and independent diff/test review are now agreed in
+  [decisions.md](decisions.md). Scripted completion is integration
   evidence, not measured model quality or real cost savings. Court permission to
   override the task's restrictions is part of the comparison.
 - Record the final demo after the browser walkthrough. No backup video exists yet.
 
 ## Your next three steps
 
-1. Finish section 1 of `docs/decisions.md`: choose the independent verification
-   method for the selected recovery rule. This is evaluation design.
-2. Run `python3.12 scripts/smoke.py`. Inspect its `report.json` and one raw
-   court-on/off pair. Reconcile worker plus court cost yourself. This is reliability
-   testing and data validation.
-3. Run `python3.12 scripts/demo.py`, inspect a trial in the dashboard, and record
-   the working flow. Report the UI build error if it also happens in your terminal.
+1. Configure the real provider credential locally, then run the comparison in
+   [benchmark-review.md](benchmark-review.md).
+2. Together, inspect each arm's saved source, diff, fresh tests, and cost records.
+   Assign recovered/blocked/failed only after review.
+3. Record the working demo and publish the final checkpoint from `Chris`.
+
+## Evidence-capture checkpoint
+
+33 Python tests pass, including saved outputs for both arms, a fresh test rerun,
+and immediate stopping on human escalation. A coding pair against the HTTP mock
+court exported `REVIEW.md`, frozen seeds/prompts/decisions, source snapshots,
+diffs, tests, events, and cost summaries. Real API calls are pending credentials;
+no real-model result is claimed by this rehearsal.

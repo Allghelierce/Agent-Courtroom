@@ -60,13 +60,13 @@ class CostTests(unittest.TestCase):
             action = GroqBrain(get_task("prices")).next_action()
         self.assertAlmostEqual(action.cost_usd, (400 * .15 + 600 * .075 + 100 * .6) / 1e6)
 
-    def test_malformed_groq_tool_call_is_estimated_not_unknown(self):
+    def test_malformed_groq_tool_call_keeps_estimate_but_marks_usage_incomplete(self):
         def create(**kw):
             raise BadRequest("tool_use_failed", {"error": {"code": "tool_use_failed", "failed_generation": "x" * 400}})
         with self._groq(create):
             action = GroqBrain(get_task("prices")).next_action()
         self.assertEqual(action.tool, "invalid_tool_call")
-        self.assertTrue(action.cost_complete)
+        self.assertFalse(action.cost_complete)
         self.assertGreater(action.cost_usd, 0)
         self.assertEqual(action.usage["completion_tokens"], 100)
         self.assertTrue(action.usage["estimated"])

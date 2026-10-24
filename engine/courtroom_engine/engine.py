@@ -32,6 +32,9 @@ class RunConfig:
     all_monitors: bool = False
     step_delay: float = 0.0  # scripted brain only
     seed: Optional[Path] = None  # defaults to the task's own seed
+    evidence_dir: Optional[Path] = None
+    human_wait_seconds: float = 600
+    success_criteria: str = "pending human definition; state is engine-reported test completion only"
 
     def validate(self) -> None:
         if not isinstance(self.task, str) or (self.model is not None and (not isinstance(self.model, str) or not self.model)):
@@ -49,6 +52,8 @@ class RunConfig:
             raise ValueError("stepDelay must be between 0 and 60 seconds")
         if type(self.all_monitors) is not bool:
             raise ValueError("allMonitors must be boolean")
+        if not isinstance(self.human_wait_seconds, (int, float)) or not math.isfinite(self.human_wait_seconds) or self.human_wait_seconds < 0:
+            raise ValueError("human_wait_seconds must be a nonnegative finite number")
         if not isinstance(self.court, str) or not (self.court in ("stub", "none") or self.court.startswith(("http://", "https://"))):
             raise ValueError("court must be stub, none, or an HTTP URL")
 
@@ -109,6 +114,8 @@ class Engine:
             budget_usd=cfg.budget_usd,
             max_steps=cfg.max_steps,
             enabled_monitors=tuple(monitors.ALL_MONITORS) if cfg.all_monitors else monitors.MVP_MONITORS,
+            evidence_dir=cfg.evidence_dir / worker_id if cfg.evidence_dir else None,
+            human_wait_seconds=cfg.human_wait_seconds,
         )
         with self._lock:
             self.workers[worker_id] = worker
@@ -177,7 +184,7 @@ class Engine:
             "pricingSources": {name: p["source"] for name, p in PRICES["providers"].items()},
             "workerPricingDate": pricing_info(model)["verifiedAt"],
             "workerPricingSource": pricing_info(model)["source"],
-            "successCriteria": "pending human definition; state is engine-reported test completion only",
+            "successCriteria": cfg.success_criteria,
             "withCourt": with_court.result(),
             "withoutCourt": without_court.result(),
         }

@@ -5,6 +5,8 @@ import csv
 import hashlib
 import json
 import os
+import shutil
+import socket
 import statistics
 import subprocess
 import sys
@@ -15,7 +17,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "engine"))
 
 from courtroom_engine.bus import Bus
-from courtroom_engine.engine import Engine, RunConfig
+from courtroom_engine.engine import Engine, RunConfig, get_task
+from demo import Services, node_binary, wait_for
 
 
 def seed_digest(path: Path) -> str:
@@ -38,7 +41,21 @@ def main():
     parser.add_argument("--max-steps", type=int, default=30)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--success-criteria", help="Human-approved evaluation definition, recorded verbatim")
+    parser.add_argument("--decisions", type=Path, help="Decision record to freeze with the benchmark; provides success criteria")
+    parser.add_argument("--env-file", type=Path, help="Load API keys from a local ignored dotenv file")
+    parser.add_argument("--start-court", action="store_true", help="Start a separate court on a temporary port; same provider as the worker")
     args = parser.parse_args()
+    if args.env_file:
+        if not args.env_file.is_file():
+            parser.error("--env-file does not exist")
+        from dotenv import load_dotenv
+        load_dotenv(args.env_file, override=False)
+    decisions = args.decisions.read_text() if args.decisions else None
+    if decisions and not args.success_criteria:
+        args.success_criteria = "\n".join(line for line in decisions.splitlines()
+                                        if line.startswith(("- Success rule:", "- Allowed changes:", "- Verification method:")))
+        if len(args.success_criteria.splitlines()) != 3 or "not decided yet" in args.success_criteria:
+            parser.error("The decision record needs all three benchmark answers")
     if not 1 <= args.repetitions <= 20:
         parser.error("--repetitions must be between 1 and 20")
     if args.brain != "scripted":
@@ -48,7 +65,8 @@ def main():
         if not args.court.startswith(("http://", "https://")):
             parser.error("Real comparisons need the HTTP court; the stub court's $0 cost isn't a real overhead")
     configs = {task: RunConfig(task=task, brain=args.brain, model=args.model, court=args.court,
-                               budget_usd=args.budget, max_steps=args.max_steps) for task in args.tasks}
+                               budget_usd=args.budget, max_steps=args.max_steps, human_wait_seconds=0,
+                               success_criteria=args.success_criteria or "Scripted integration check; human outcome review pending") for task in args.tasks}
     try:
         for cfg in configs.values():
             cfg.validate()
@@ -56,7 +74,18 @@ def main():
         parser.error(str(e))
     out = args.output or ROOT / "runs/benchmarks" / datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
     out.mkdir(parents=True, exist_ok=False)
+    if decisions:
+        (out / "decisions.md").write_text(decisions)
+    for task, cfg in configs.items():
+        definition = get_task(task)
+        seed = out / "seeds" / task
+        shutil.copytree(definition.seed, seed, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        cfg.seed, cfg.evidence_dir = seed, out / "evidence"
+        (seed.parent / f"{task}-prompt.json").write_text(json.dumps({
+            "prompt": definition.prompt, "systemPrompt": definition.system_prompt, "tools": definition.tools,
+        }, indent=2) + "\n")
     bus = Bus(record_path=out / "events.jsonl", db_path=out / "events.sqlite")
+    services = Services(out, dict(os.environ))
     try:
         revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
         dirty = bool(subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT, text=True).strip())
@@ -64,12 +93,31 @@ def main():
         revision, dirty = "unavailable", True
     results = []
     try:
+        if args.start_court:
+            with socket.socket() as sock:
+                sock.bind(("127.0.0.1", 0))
+                port = sock.getsockname()[1]
+            env = {**os.environ, "COURT_PORT": str(port), "COURT_HOST": "127.0.0.1",
+                   "COURT_CASES_DIR": str((out / "cases").resolve()),
+                   "COURT_MOCK": "1" if args.brain == "scripted" else "0",
+                   "COURT_PROVIDER": "groq" if args.brain == "groq" else "anthropic"}
+            court = services.start("court", [node_binary(), "--import", "tsx", "src/server.ts"], ROOT / "court", env)
+            wait_for(f"http://127.0.0.1:{port}/health", court)
+            for cfg in configs.values():
+                cfg.court = f"http://127.0.0.1:{port}/verdict"
+        (out / "manifest.json").write_text(json.dumps({
+            "revision": revision, "dirtyWorkingTree": dirty, "brain": args.brain,
+            "repetitions": args.repetitions, "maxSteps": args.max_steps, "workerBudgetUsd": args.budget,
+            "humanEscalation": "stop immediately; no human intervention during comparison",
+            "armOrder": ["withCourt", "withoutCourt"], "successCriteria": args.success_criteria,
+            "limitation": "Worker budget checked between calls; court costs separate. One pair is exploratory, not a statistical result.",
+        }, indent=2) + "\n")
         engine = Engine(bus)
         for task in args.tasks:
             for repetition in range(args.repetitions):
                 result = engine.compare(configs[task])
                 result.update(repetition=repetition + 1, revision=revision, dirtyWorkingTree=dirty,
-                              seedDigest=seed_digest(ROOT / "seed_repos" / ("checkout" if task == "coding" else "price_watch")))
+                              seedDigest=seed_digest(configs[task].seed))
                 if args.success_criteria:
                     result["successCriteria"] = args.success_criteria
                 results.append(result)
@@ -82,6 +130,7 @@ def main():
                              f"ANTHROPIC_API_KEY or GROQ_API_KEY set and COURT_MOCK unset. Partial results: {out}")
     finally:
         bus.close()
+        services.close()
     rows = []
     for task in args.tasks:
         for arm in ("withCourt", "withoutCourt"):
@@ -100,6 +149,23 @@ def main():
         writer = csv.DictWriter(file, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
+    review = ["# Benchmark review — pending", "", "Do not infer recovery from engine completion alone.",
+              "Review changes, rerun output, and the documented unresolved integration before assigning an outcome.", ""]
+    for result in results:
+        review += [f"## {result['task']} pair {result['repetition']}", ""]
+        for arm in ("withCourt", "withoutCourt"):
+            r = result[arm]
+            directory = Path(r["evidencePath"]).relative_to(out)
+            review += [f"### {arm}: {r['workerId']}", "", f"Engine: {r['state']}. {r.get('summary', '')}",
+                       f"Worker cost: {r['workerCostUsd']}; court: {r['courtCostUsd']}; total: {r['totalCostUsd']} ({result['costMode']}).",
+                       f"Evidence capture error: {r['evidenceError'] or 'none'}.",
+                       f"[Verification record]({directory}/verification.json)"]
+            if result["task"] == "coding":
+                review += [f"[Saved source]({directory}/source/) · [Diff]({directory}/changes.diff) · [Fresh test output]({directory}/tests.txt)"]
+            else:
+                review += [f"[Saved prices and flags]({directory}/prices.json)"]
+            review += ["", "Human outcome: **pending**. Evidence and rationale: **pending**.", ""]
+    (out / "REVIEW.md").write_text("\n".join(review))
     print(f"Saved raw runs, event history, and JSON/CSV summaries to {out}")
 
 

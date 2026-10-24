@@ -147,8 +147,8 @@ class GroqBrain:
                 + completion_tokens * self.price_out) / 1_000_000
 
     def _failed_call(self, e, request: list[dict[str, Any]]) -> Action:
-        # Groq still bills the rejected generation but its error carries no usage, so estimate
-        # it at ~4 characters per token rather than leave the whole run's cost unknown.
+        # Retain a rough estimate for the budget meter when errors omit usage. It is
+        # not provider-reported usage: mark totals incomplete instead of claiming savings.
         body = getattr(e, "body", None)
         error = body.get("error", body) if isinstance(body, dict) else {}
         generated = (error.get("failed_generation") if isinstance(error, dict) else None) or ""
@@ -156,7 +156,8 @@ class GroqBrain:
         completion_tokens = len(generated) // 4
         return Action(tool="invalid_tool_call", error=f"Malformed tool call: {str(e)[:300]}", model=self.model,
                       tokens=prompt_tokens + completion_tokens, cost_usd=self._cost(prompt_tokens, completion_tokens),
-                      usage={"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "estimated": True})
+                      usage={"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "estimated": True},
+                      cost_complete=False)
 
     def next_action(self) -> Action:
         request = self._request_messages()

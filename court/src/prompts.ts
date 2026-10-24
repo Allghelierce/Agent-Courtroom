@@ -17,7 +17,7 @@ export function renderPacket(p: EvidencePacket): string {
   }
   lines.push(`Steps run: ${p.stats.totalSteps}. Steps since tests last improved: ${p.stats.stepsSinceProgress}.`);
   lines.push(`Errors in window: ${p.stats.errorsInWindow}${p.stats.distinctErrors.length ? ` (distinct: ${p.stats.distinctErrors.join(" | ")})` : ""}`);
-  if (p.stats.lastError) lines.push(`Most recent error: ${truncate(p.stats.lastError, 200)}`);
+  if (p.stats.lastError) lines.push(`Most recent error or test failure: ${truncate(p.stats.lastError, 200)}`);
   for (const r of p.stats.repeatedCalls.slice(0, 5)) {
     lines.push(`Repeated call x${r.count}: ${r.tool} ${truncate(r.args, 120)} (events ${r.eventIds.map((i) => `#${i}`).join(", ")})`);
   }

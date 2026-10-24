@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fromEnginePacket } from "../src/packet.ts";
 import { holdTrial } from "../src/court.ts";
 import { renderPacket } from "../src/prompts.ts";
@@ -78,21 +78,24 @@ test("every event the engine sends is kept, even past the default window of 15",
   assert.equal(p.events.length, 20);
 });
 
-// fa's engine-shaped fixture: either an EnginePacket itself or { packet, verdict }.
-const checkout = new URL("../fixtures/engine-packet-checkout.json", import.meta.url);
-test("engine-packet-checkout.json: mock court gives the expected ruling", { skip: existsSync(checkout) ? false : "fixture not landed yet" }, async () => {
-  const raw = JSON.parse(readFileSync(checkout, "utf8"));
-  const ep: EnginePacket = raw.packet ?? raw;
-  const p = fromEnginePacket(ep);
-  assert.equal(p.spend.usd, ep.spend.costUsd);
-  assert.deepEqual(p.progress, ep.testProgress);
-  assert.equal(p.charge.id, ep.charge.id);
-  const trial = await holdTrial(p, { mock: true });
-  const ids = new Set(p.events.map((e) => e.id));
-  for (const id of trial.verdict.cited_events) assert.ok(ids.has(id), `cited event ${id} is not in the packet`);
-  const note: string | undefined = raw.verdict?.expected ?? raw.verdict?.ruling;
-  if (note) {
-    const ok = note.split(":")[0].split(/\s+or\s+/).map((r) => r.trim()) as Ruling[];
-    assert.ok(ok.includes(trial.verdict.ruling), `got ${trial.verdict.ruling}, expected ${ok.join(" or ")}`);
-  }
-});
+// fa's engine-shaped fixtures (fixtures/engine-packet-*.json): an EnginePacket itself or { packet, verdict }.
+const fixtures = new URL("../fixtures/", import.meta.url);
+for (const file of readdirSync(fixtures).filter((f) => /^engine-packet-.*\.json$/.test(f)).sort()) {
+  test(`${file}: fromEnginePacket keeps the engine's numbers and the mock court gives the expected ruling`, async () => {
+    const raw = JSON.parse(readFileSync(new URL(file, fixtures), "utf8"));
+    const ep: EnginePacket = raw.packet ?? raw;
+    const p = fromEnginePacket(ep);
+    assert.equal(p.spend.usd, ep.spend.costUsd);
+    assert.deepEqual(p.progress, ep.testProgress);
+    assert.equal(p.charge.id, ep.charge.id);
+    assert.equal(p.task, ep.task);
+    const trial = await holdTrial(p, { mock: true });
+    const ids = new Set(p.events.map((e) => e.id));
+    for (const id of trial.verdict.cited_events) assert.ok(ids.has(id), `cited event ${id} is not in the packet`);
+    const note: string | undefined = raw.verdict?.expected ?? raw.verdict?.ruling;
+    if (note) {
+      const ok = note.split(":")[0].split(/\s+or\s+/).map((r) => r.trim()) as Ruling[];
+      assert.ok(ok.includes(trial.verdict.ruling), `got ${trial.verdict.ruling}, expected ${ok.join(" or ")}`);
+    }
+  });
+}

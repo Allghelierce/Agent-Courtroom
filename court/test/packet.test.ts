@@ -36,12 +36,21 @@ test("stepsSinceProgress counts from the last step that raised testsPassing", ()
   assert.equal(packet.stats.stepsSinceProgress, 5);
 });
 
-test("repeatedCalls lists the charged edit first, ahead of the more frequent run_tests", () => {
-  const [top, next] = packet.stats.repeatedCalls;
+test("repeatedCalls lists the charged edit first", () => {
+  const [top] = packet.stats.repeatedCalls;
   assert.equal(top.tool, "edit_file");
   assert.match(top.args, /src\/rates\.ts/);
   assert.deepEqual(top.eventIds, charge.eventIds);
   assert.equal(top.count, 3);
+});
+
+test("repeatedCalls ranks charged overlap ahead of a more frequent call", () => {
+  // Five identical extra run_tests calls outnumber the 3 charged edits.
+  const last = events.at(-1)!;
+  const extra = [1, 2, 3, 4, 5].map((i) => ({ ...last, id: 100 + i, step: last.step + i, tool: "run_tests", args: {}, error: null }));
+  const p = buildPacket(charge, [...events, ...extra], { budgetUsd, window: 20 });
+  const [top, next] = p.stats.repeatedCalls;
+  assert.deepEqual(top.eventIds, charge.eventIds);
   assert.equal(next.tool, "run_tests");
   assert.ok(next.count > top.count);
 });

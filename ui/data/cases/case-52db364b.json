@@ -1,0 +1,61 @@
+{
+  "id": "case-52db364b",
+  "workerId": "worker-04",
+  "charge": {
+    "workerId": "worker-04",
+    "kind": "stalling",
+    "summary": "Passing tests stuck at 7/12 for the last 8 steps",
+    "eventIds": [
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ]
+  },
+  "prosecution": {
+    "side": "prosecution",
+    "model": "mock",
+    "argument": "The worker has made the same run_tests call 2 times, at events 1, 5. Tests have not improved in 8 steps while spend reached $0.23, 23% of budget. The same failure keeps coming back: test_vendor_name: expected 'Acme', got '\\ufeffAcme'. The worker is going in circles, and the court should change its strategy before more money burns.",
+    "cited_events": [
+      1,
+      5
+    ],
+    "costUsd": 0
+  },
+  "defense": {
+    "side": "defense",
+    "model": "mock",
+    "argument": "The worker took the suite from 3 to 7 of 12 passing, at events 5. The remaining failure is \"test_vendor_name: expected 'Acme', got '\\ufeffAcme'\", an error the worker's code edits cannot fix. That progress is worth keeping. Redirect the worker; do not halt it.",
+    "cited_events": [
+      5
+    ],
+    "costUsd": 0
+  },
+  "verdict": {
+    "ruling": "change_strategy",
+    "instruction": "Stop repeating the last change. Re-read the failing test's assertion, try a different fix, and if it still fails after one attempt, skip the test and flag it for human review.",
+    "reasoning": "The worker repeated the same action at events 1, 5, 6, 7, 8, 9, 10, 11, 12, 13 with no new tests passing, but most of the suite is fixed and the task is still achievable another way.",
+    "cited_events": [
+      1,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ]
+  },
+  "precedents": [],
+  "judgeModel": "mock",
+  "costUsd": 0,
+  "startedAt": "2026-10-24T22:04:24.060Z",
+  "finishedAt": "2026-10-24T22:04:24.061Z",
+  "mock": true
+}

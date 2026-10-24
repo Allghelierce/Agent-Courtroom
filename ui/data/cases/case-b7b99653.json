@@ -1,0 +1,52 @@
+{
+  "id": "case-b7b99653",
+  "workerId": "worker-03",
+  "charge": {
+    "workerId": "worker-03",
+    "kind": "looping",
+    "summary": "Made the same edit to src/rates.ts 3 times in the last 10 steps",
+    "eventIds": [
+      12,
+      14,
+      16
+    ]
+  },
+  "prosecution": {
+    "side": "prosecution",
+    "model": "mock",
+    "argument": "The worker has made the same edit_file call 3 times, at events 12, 14, 16. Tests have not improved in 5 steps while spend reached $0.31, 31% of budget. The same failure keeps coming back: 1 failing; test_fetch_rates: ECONNREFUSED api.rates.example:443. The worker is going in circles, and the court should change its strategy before more money burns.",
+    "cited_events": [
+      12,
+      14,
+      16
+    ],
+    "costUsd": 0
+  },
+  "defense": {
+    "side": "defense",
+    "model": "mock",
+    "argument": "The worker took the suite from 3 to 11 of 12 passing, at events 4, 7, 11. The remaining failure is \"1 failing; test_fetch_rates: ECONNREFUSED api.rates.example:443\", an error the worker's code edits cannot fix. That progress is worth keeping. Redirect the worker; do not halt it.",
+    "cited_events": [
+      4,
+      7,
+      11
+    ],
+    "costUsd": 0
+  },
+  "verdict": {
+    "ruling": "change_strategy",
+    "instruction": "Stop editing the code for the failing test. The external API it calls is unreachable: mock that API in the test, mark the test for human review, and finish the rest of the suite.",
+    "reasoning": "The worker repeated the same action at events 12, 14, 16 with no new tests passing, but most of the suite is fixed and the task is still achievable another way.",
+    "cited_events": [
+      12,
+      14,
+      16
+    ]
+  },
+  "precedents": [],
+  "judgeModel": "mock",
+  "costUsd": 0,
+  "startedAt": "2026-10-24T22:04:23.774Z",
+  "finishedAt": "2026-10-24T22:04:23.775Z",
+  "mock": true
+}

@@ -127,6 +127,8 @@ Four parts, each one small enough for one person to own:
 
 **The contract between A and B** is the event log, the charge, and the verdict JSON above. Agree on those shapes first so both sides can build against mocks.
 
-### UI mockup
+### UI
 
-Pixel-art courtroom draft: https://claude.ai/artifact/YbpiWve6SgVTkYuexMZMpV (private until shared). It currently shows the price-watcher worker; update it if the coding worker sticks.
+The UI is the Next.js app in `ui/` (`cd ui && npm run dev`). Read `ui/ART.md` before changing anything visual.
+
+The original pixel-art mockup (price-watcher version, now superseded by `ui/`): https://claude.ai/artifact/YbpiWve6SgVTkYuexMZMpV

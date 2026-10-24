@@ -52,3 +52,19 @@ curl -i -X POST localhost:4100/verdict \
 ```
 
 Run with `COURT_MOCK=1` to try it without calling a model.
+
+## Calling the court from the engine (Python)
+
+`clients/python/court_client.py` is a stdlib-only client for `POST /verdict`. Copy it into the engine as-is.
+
+```python
+from court_client import convene
+
+verdict = convene(packet, url="http://localhost:4100", timeout=60)
+# {"ruling": "change_strategy", "instruction": "...", "reasoning": "...",
+#  "cited_events": [14, 16, 18], "caseId": "case-b3b5fd0e"}
+```
+
+- `packet` is the `EvidencePacket` from `shared/schema.ts`, either as a plain dict or built from `courtroom_engine.schema` dataclasses. Anything with `.to_json()` is converted, including nested values.
+- **It never raises.** If the court is down, times out, returns a non-200, or sends back an invalid verdict, you get `{"ruling": "escalate", "reasoning": "Court unreachable: <why>", "cited_events": [], "caseId": None}`. A worker never hangs on a dead court.
+- Tests: `cd clients/python && python3 -m unittest`. To also run the live test, start `COURT_MOCK=1 npm run serve` and set `COURT_URL=http://localhost:4100`.

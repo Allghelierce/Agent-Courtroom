@@ -74,6 +74,7 @@ export type WorkerStatus = {
   summary?: string; // set when the run ends
   courtCostUsd?: number;
   courtCostComplete?: boolean;
+  workerCostComplete?: boolean;
   costMode?: "simulated" | "estimated_from_usage";
 };
 
@@ -109,6 +110,7 @@ export type StreamMessage = (
   | { type: "charge"; data: Charge }
   | { type: "verdict"; data: { workerId: string; chargeId: number; verdict: Verdict; caseId?: string } }
   | { type: "trial"; data: import("../court/src/types").Trial }
+  | { type: "usage"; data: { workerId: string; model: string; usage: Record<string, unknown>; costUsd: number | null; mode: string; pricingDate: string } }
   | { type: "comparison_error"; data: { error: string } }
   | { type: "comparison"; data: ComparisonResult }
 ) & { sequence?: number }; // durable SSE cursor; older JSONL fixtures omit it

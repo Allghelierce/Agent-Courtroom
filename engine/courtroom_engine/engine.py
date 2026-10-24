@@ -16,6 +16,7 @@ from .bus import Bus
 from .court import HttpCourt, StubCourt
 from .tasks import TASKS, Task
 from .worker import Worker
+from .costs import PRICES
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -163,6 +164,8 @@ class Engine:
             "budgetUsd": cfg.budget_usd,
             "maxSteps": cfg.max_steps,
             "costMode": "simulated" if cfg.brain == "scripted" else "estimated_from_usage",
+            "pricingDate": PRICES["verifiedAt"],
+            "pricingSource": PRICES["source"],
             "successCriteria": "pending human definition; state is engine-reported test completion only",
             "withCourt": with_court.result(),
             "withoutCourt": without_court.result(),

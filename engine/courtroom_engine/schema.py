@@ -100,6 +100,7 @@ class WorkerStatus:
     courtCostUsd: float = 0.0
     courtCostComplete: bool = True
     costMode: str = "simulated"
+    workerCostComplete: bool = True
 
     def to_json(self) -> dict[str, Any]:
         return _drop_none(asdict(self))

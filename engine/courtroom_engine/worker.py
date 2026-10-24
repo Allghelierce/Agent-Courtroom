@@ -13,6 +13,7 @@ from .bus import Bus
 from .court import Court, build_packet
 from .schema import Charge, Event, Verdict, WorkerStatus
 from .tasks import Env, Task
+from .costs import PRICES
 
 HUMAN_WAIT_SECONDS = 600
 
@@ -90,7 +91,7 @@ class Worker:
         status = self.status.to_json()
         return {**status, "seconds": round(self.elapsed_seconds(), 3),
                 "workerCostUsd": round(self.status.costUsd, 6),
-                "totalCostUsd": round(self.status.costUsd + self.status.courtCostUsd, 6) if self.status.courtCostComplete else None,
+                "totalCostUsd": round(self.status.costUsd + self.status.courtCostUsd, 6) if self.status.courtCostComplete and self.status.workerCostComplete else None,
                 "caseIds": sorted(self.case_ids), "courtModes": sorted(self.court_modes),
                 "outcomeVerified": False}
 
@@ -119,6 +120,8 @@ class Worker:
             self._publish_status()
             self._loop(env)
         except Exception as e:  # a crashed worker should still end its run cleanly
+            if self.brain_mode == "claude":
+                self.status.workerCostComplete = False
             self._finish("failed", f"Worker crashed: {type(e).__name__}: {e}")
         finally:
             self.stopped = time.monotonic()
@@ -137,6 +140,10 @@ class Worker:
 
             action = self.brain.next_action()
             self.status.costUsd += action.cost_usd
+            self.status.workerCostComplete &= action.cost_complete
+            self.bus.publish("usage", {"workerId": self.id, "model": action.model, "usage": action.usage,
+                                       "costUsd": action.cost_usd if action.cost_complete else None,
+                                       "mode": self.status.costMode, "pricingDate": PRICES["verifiedAt"]})
 
             if action.tool is None:
                 self.status.testsPassing, self.status.testsTotal = env.baseline()

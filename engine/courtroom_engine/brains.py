@@ -12,13 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from .tasks import Task
-
-# USD per million tokens: input, output, cache write (5 min), cache read.
-PRICING = {
-    "claude-opus-5-5": (4.00, 20.00, 5.00, 0.20),
-    "claude-sonnet-5-5": (2.00, 10.00, 2.50, 0.20),
-    "claude-haiku-5-5": (0.10, 0.50, 0.125, 0.01),
-}
+from .costs import model_rates, price_usage
 
 
 def court_order(instruction: str) -> str:
@@ -32,27 +26,21 @@ class Action:
     tokens: int = 0
     cost_usd: float = 0.0
     text: str = ""
+    usage: dict[str, Any] = field(default_factory=dict)
+    model: str = "scripted"
+    cost_complete: bool = True
 
 
 class ClaudeBrain:
     def __init__(self, task: Task, model: str = "claude-opus-5-5", effort: str = "medium"):
         import anthropic
 
-        self.client = anthropic.Anthropic()
+        self.client = anthropic.Anthropic(max_retries=0, timeout=60.0)
         self.task = task
         self.model = model
         self.effort = effort
         self.messages: list[dict[str, Any]] = [{"role": "user", "content": task.prompt}]
         self._pending_tool_id: Optional[str] = None
-
-    def _cost(self, usage) -> float:
-        price_in, price_out, price_write, price_read = PRICING.get(self.model, PRICING["claude-opus-5-5"])
-        return (
-            usage.input_tokens * price_in
-            + usage.output_tokens * price_out
-            + (usage.cache_creation_input_tokens or 0) * price_write
-            + (usage.cache_read_input_tokens or 0) * price_read
-        ) / 1_000_000
 
     def next_action(self) -> Action:
         response = self.client.beta.messages.create(
@@ -75,18 +63,20 @@ class ClaudeBrain:
             + (usage.cache_creation_input_tokens or 0)
             + (usage.cache_read_input_tokens or 0)
         )
-        cost = self._cost(usage)
+        usage_record = usage.model_dump()
+        cost = price_usage(response.model, usage_record)
+        accounting = {"usage": usage_record, "model": response.model, "cost_complete": cost is not None}
         # Append the full content (thinking blocks included) so the history stays append-only.
         self.messages.append({"role": "assistant", "content": response.content})
         text = " ".join(b.text for b in response.content if b.type == "text").strip()
 
         if response.stop_reason == "refusal":
-            return Action(tool=None, tokens=tokens, cost_usd=cost, text=f"refused: {text}")
+            return Action(tool=None, tokens=tokens, cost_usd=cost or 0, text=f"refused: {text}", **accounting)
         tool_use = next((b for b in response.content if b.type == "tool_use"), None)
         if tool_use is None:
-            return Action(tool=None, tokens=tokens, cost_usd=cost, text=text)
+            return Action(tool=None, tokens=tokens, cost_usd=cost or 0, text=text, **accounting)
         self._pending_tool_id = tool_use.id
-        return Action(tool=tool_use.name, args=dict(tool_use.input), tokens=tokens, cost_usd=cost, text=text)
+        return Action(tool=tool_use.name, args=dict(tool_use.input), tokens=tokens, cost_usd=cost or 0, text=text, **accounting)
 
     def observe(self, output: str, is_error: bool, instruction: Optional[str] = None) -> None:
         content: list[dict[str, Any]] = [
@@ -102,7 +92,10 @@ class ScriptedBrain:
 
     def __init__(self, task: Task, model: str = "claude-opus-5-5", step_delay: float = 0.0):
         self.step_delay = step_delay  # seconds per step, so a live dashboard has something to watch
-        self.price_in, self.price_out, _, _ = PRICING.get(model, PRICING["claude-opus-5-5"])
+        rates = model_rates(model)
+        if rates is None:
+            raise ValueError(f"No simulation price for model {model}")
+        self.price_in, self.price_out = rates[:2]
         self.script = task.make_script()
         self.plan = list(self.script.plan)
         self.steps = 0

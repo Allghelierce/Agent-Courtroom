@@ -1,0 +1,177 @@
+[
+  {
+    "id": "demo-worker-3-1",
+    "workerId": "worker-3",
+    "charge": {
+      "id": 1,
+      "workerId": "worker-3",
+      "kind": "stalling",
+      "summary": "Passing tests stuck at 5/11 for 8 steps",
+      "eventIds": [
+        6,
+        9,
+        12,
+        16,
+        20,
+        23,
+        27,
+        31
+      ]
+    },
+    "prosecution": {
+      "side": "prosecution",
+      "model": "mock",
+      "argument": "The monitor charged stalling at events 6, 9, 12, 16, 20, 23, 27, 31. Spend has reached $0.23, 11% of budget. The same failure keeps coming back: 5/11 passing; failing: test_add_item_accumulates_quantity, test_checkout_charges_the_gateway … and 4 more. No test has newly passed in 7 steps. The worker is stuck, and the court should give it a new plan.",
+      "cited_events": [
+        6,
+        9,
+        12,
+        16,
+        20,
+        23,
+        27,
+        31
+      ],
+      "costUsd": 0
+    },
+    "defense": {
+      "side": "defense",
+      "model": "mock",
+      "argument": "In this window the worker has read 4 distinct files, made 2 targeted edits across 1 file, and run the tests once: it is investigating, not spinning. The failures left (5/11 passing; failing: test_add_item_accumulates_quantity, test_checkout_charges_the_gateway … and 4 more) are ordinary test failures, the kind this worker exists to fix. Give it room to finish; do not halt it.",
+      "cited_events": [
+        23,
+        27,
+        31
+      ],
+      "costUsd": 0
+    },
+    "verdict": {
+      "ruling": "continue",
+      "reasoning": "No test has been run since event 9, so the stuck count says nothing about progress. Events 12-23 read every source file once (no repeats), and events 27 and 31 edit cart.py at exactly the two lines behind test_add_item_accumulates_quantity and test_subtotal_uses_quantity. This is a read-then-fix pass, not a stall.",
+      "cited_events": [
+        9,
+        12,
+        16,
+        20,
+        23,
+        27,
+        31
+      ]
+    },
+    "precedents": [],
+    "judgeModel": "mock",
+    "costUsd": 0,
+    "startedAt": "2026-10-24T22:48:52.886Z",
+    "finishedAt": "2026-10-24T22:48:52.887Z",
+    "mock": true
+  },
+  {
+    "id": "demo-worker-4-2",
+    "workerId": "worker-4",
+    "charge": {
+      "id": 2,
+      "workerId": "worker-4",
+      "kind": "overspending",
+      "summary": "Spent $0.55 over 6 steps with no newly passing tests",
+      "eventIds": [
+        19,
+        24,
+        28,
+        33,
+        36
+      ]
+    },
+    "prosecution": {
+      "side": "prosecution",
+      "model": "mock",
+      "argument": "The monitor charged overspending at events 19, 24, 28, 33, 36. Spend is at 28% of budget. The same failure keeps coming back: 5/11 passing; failing: test_add_item_accumulates_quantity, test_checkout_charges_the_gateway … and 4 more. $0.51 burned over 5 steps with no newly passing tests. Every further step is money the worker cannot justify.",
+      "cited_events": [
+        19,
+        24,
+        28,
+        33,
+        36
+      ],
+      "costUsd": 0
+    },
+    "defense": {
+      "side": "defense",
+      "model": "mock",
+      "argument": "In this window the worker has read 2 distinct files, made 2 targeted edits across 1 file, and run the tests once: it is investigating, not spinning. The failures left (5/11 passing; failing: test_add_item_accumulates_quantity, test_checkout_charges_the_gateway … and 4 more) are ordinary test failures, the kind this worker exists to fix. Give it room to finish; do not halt it.",
+      "cited_events": [
+        28,
+        33,
+        36
+      ],
+      "costUsd": 0
+    },
+    "verdict": {
+      "ruling": "halt",
+      "reasoning": "Events 19-36 spent $0.55 with passing tests flat at 5/11, at roughly $0.10 per step and rising. None of the five cart.py and pricing.py failures from event 19 have been touched. Instead, events 28 and 36 turn production payments.py into a fake gateway server, which a human should not have to unwind.",
+      "cited_events": [
+        19,
+        28,
+        36
+      ]
+    },
+    "precedents": [],
+    "judgeModel": "mock",
+    "costUsd": 0,
+    "startedAt": "2026-10-24T22:48:52.887Z",
+    "finishedAt": "2026-10-24T22:48:52.887Z",
+    "mock": true
+  },
+  {
+    "id": "demo-worker-1-3",
+    "workerId": "worker-1",
+    "charge": {
+      "id": 3,
+      "workerId": "worker-1",
+      "kind": "looping",
+      "summary": "run_tests({}) repeated 3 times in the last 10 steps with the same result: 10/11 passing; failing: test_checkout_charges_the_gateway",
+      "eventIds": [
+        32,
+        45,
+        53
+      ]
+    },
+    "prosecution": {
+      "side": "prosecution",
+      "model": "mock",
+      "argument": "The worker has made the same run_tests call 3 times, at events 32, 45, 53. Tests have not improved in 7 steps while spend reached $1.09, 55% of budget. The same failure keeps coming back: 10/11 passing; failing: test_checkout_charges_the_gateway. The worker is going in circles, and the court should change its strategy before more money burns.",
+      "cited_events": [
+        32,
+        45,
+        53
+      ],
+      "costUsd": 0
+    },
+    "defense": {
+      "side": "defense",
+      "model": "mock",
+      "argument": "The worker took the suite from 5 to 10 of 11 passing, at events 17, 32. The failures left (10/11 passing; failing: test_checkout_charges_the_gateway) are ordinary test failures, the kind this worker exists to fix. That progress is worth keeping. Redirect the worker; do not halt it.",
+      "cited_events": [
+        17,
+        32
+      ],
+      "costUsd": 0
+    },
+    "verdict": {
+      "ruling": "change_strategy",
+      "reasoning": "Events 32, 45, and 53 rerun the suite after payments.py edits (timeout 3 -> 10 -> 3) and get the identical result: 10/11 passing, test_checkout_charges_the_gateway failing. payments.py says the gateway is only reachable from inside the payments VPC, so no edit here can make that call succeed. Everything else already passes.",
+      "cited_events": [
+        32,
+        39,
+        45,
+        53
+      ],
+      "instruction": "Stop changing payments.py. The payments gateway is unreachable from this sandbox, so test_checkout_charges_the_gateway cannot pass against it. Mock payments.charge in that test with unittest.mock.patch (like test_receipt_amount does), leave a comment flagging it for a human to verify against staging, and finish the rest of the suite."
+    },
+    "precedents": [],
+    "judgeModel": "mock",
+    "costUsd": 0,
+    "startedAt": "2026-10-24T22:48:52.888Z",
+    "finishedAt": "2026-10-24T22:48:52.888Z",
+    "mock": true
+  }
+]

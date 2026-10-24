@@ -25,6 +25,7 @@
   --color-panel: var(--panel);
   --color-inset: var(--inset);
   --color-edge: var(--edge);
+  --color-shadow: var(--shadow);
   --color-text: var(--text);
   --color-soft: var(--soft);
   --color-gold: var(--gold);
@@ -150,6 +151,26 @@ canvas.pixelated { image-rendering: pixelated; image-rendering: crisp-edges; dis
   80% { transform: translate(var(--px), var(--px)); }
 }
 
+/* The anime cut-in: slides in, holds, slides out. Its speed lines are hard-edged stripes. */
+.cutin { animation: cutin 1.3s steps(13) forwards; }
+@keyframes cutin {
+  0% { transform: translateX(-100%); }
+  15% { transform: translateX(0); }
+  85% { transform: translateX(0); opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
+}
+.cutin-lines {
+  background: repeating-linear-gradient(-20deg, transparent 0 24px, rgb(255 255 255 / 0.18) 24px 32px, transparent 32px 64px);
+  animation: cutin-lines 0.4s steps(4) infinite;
+}
+@keyframes cutin-lines { to { background-position: -64px 0; } }
+
+.pop { opacity: 0; animation: pop 0.2s steps(3) forwards; }
+@keyframes pop {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .blink { animation: blink 1s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 
@@ -159,5 +180,6 @@ canvas.pixelated { image-rendering: pixelated; image-rendering: crisp-edges; dis
 @media (prefers-reduced-motion: reduce) {
   .burst.show { animation: none; transform: translate(-50%, -50%) rotate(-6deg) scale(1); }
   .stamp { animation: none; transform: rotate(-4deg); opacity: 1; }
-  .shake, .blink, .pulse-step { animation: none; }
+  .shake, .blink, .pulse-step, .cutin-lines { animation: none; }
+  .pop { animation: none; opacity: 1; }
 }

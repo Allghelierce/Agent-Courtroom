@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { RulingTag } from "@/components/Pieces";
-import { KIND_LABEL, clock, repoFor, useCourtData, usd } from "@/lib/data";
+import { KIND_LABEL, clock, usd } from "@/lib/data";
+import { useLive } from "@/lib/live";
 
 export default function CaseLog() {
-  const { trials, source } = useCourtData();
-  const newest = trials.toReversed();
+  const { caseLog, courtUp } = useLive();
+  const newest = caseLog.toReversed();
 
   return (
     <div className="flex flex-col gap-6">
@@ -15,7 +16,7 @@ export default function CaseLog() {
           <h1 className="text-[28px]">Case log</h1>
           <p className="m-0">Every trial the court has held, newest first. Open one to replay it.</p>
         </div>
-        <span className="text-sm text-soft">{source === "live" ? "Live from the court server" : "Demo data (court server offline)"}</span>
+        <span className="text-sm text-soft">{courtUp ? "From the court server" : "Demo cases (court server offline)"}</span>
       </div>
 
       {newest.length === 0 ? (
@@ -26,7 +27,7 @@ export default function CaseLog() {
             <li key={t.id} className="px-box grid gap-4 p-4 md:grid-cols-[180px_minmax(0,1fr)_auto] md:items-center">
               <div className="flex flex-col gap-1">
                 <span className="font-display text-[20px] leading-none">{t.workerId}</span>
-                <span className="text-sm text-soft">{repoFor(t.workerId)} · {clock(t.finishedAt)}</span>
+                <span className="text-sm text-soft">{clock(t.finishedAt)}</span>
               </div>
               <div className="flex min-w-0 flex-col gap-2">
                 <p className="m-0">

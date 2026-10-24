@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { DotGothic16, Pixelify_Sans } from "next/font/google";
 import { SiteHeader } from "@/components/SiteHeader";
+import { LiveProvider } from "@/lib/live";
 import "./globals.css";
 
 const pixelify = Pixelify_Sans({ variable: "--font-pixelify", subsets: ["latin"], weight: ["500", "700"] });
@@ -19,7 +20,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Suspense fallback={<div className="h-[104px]" />}>
           <SiteHeader />
         </Suspense>
-        <main className="mx-auto w-full max-w-[1200px] px-4 pb-16">{children}</main>
+        <LiveProvider>
+          <main className="mx-auto w-full max-w-[1200px] px-4 pb-16">{children}</main>
+        </LiveProvider>
       </body>
     </html>
   );

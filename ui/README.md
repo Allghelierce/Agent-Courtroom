@@ -1,36 +1,29 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Agent Courtroom UI
 
-## Getting Started
+The dashboard, courtroom and case log. Next.js. Read `ART.md` before changing anything visual.
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```sh
+npm install
+npm run dev        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Where the data comes from
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Workers, events, charges and verdicts:** the engine's SSE stream at `NEXT_PUBLIC_STREAM_URL` (default `http://localhost:8787/stream`). If nothing answers within 1.5 seconds, the dashboard replays the bundled demo run (`data/stream-demo.json`, from `court/fixtures/stream-demo-4workers.jsonl`) in the browser, with play, pause, 1x/2x/4x and restart controls.
+- **Trials (the courtroom dialogue):** the court server at `NEXT_PUBLIC_COURT_URL` (default `http://localhost:4100`, `cd ../court && npm run serve`). A stream verdict is matched to its trial by worker and charge id. When the court server is offline, the bundled mock trials in `data/stream-trials.json` stand in.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The whole run lives in `lib/live.tsx`, mounted in the root layout, so it keeps playing while you watch a trial.
 
-## Learn More
+## Refreshing the bundled demo
 
-To learn more about Next.js, take a look at the following resources:
+When `court/fixtures/stream-demo-4workers.jsonl` or the court's mock changes:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```sh
+npm run sync-data
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+It copies the stream and holds a mock trial (court code, no model calls) for each charge in it, keeping the stream's ruling.
 
-## Deploy on Vercel
+## Gotcha
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The dev server doesn't always pick up edits to `app/globals.css`. If a style change doesn't show, restart `npm run dev`.

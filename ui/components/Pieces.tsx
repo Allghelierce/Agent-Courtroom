@@ -1,10 +1,11 @@
 import type { ChargeKind, Ruling } from "@court/types";
-import { KIND_LABEL, RULING_COLOR, RULING_LABEL, STATUS_COLOR, STATUS_LABEL, type WorkerStatus } from "@/lib/data";
+import { KIND_LABEL, RULING_COLOR, RULING_LABEL, STATE_COLOR, STATE_LABEL } from "@/lib/data";
+import type { WorkerState } from "@/lib/stream";
 
-export function StatusTag({ status }: { status: WorkerStatus }) {
+export function StatusTag({ state }: { state: WorkerState }) {
   return (
-    <span className={`px-tag ${status === "on_trial" ? "pulse-step" : ""}`} style={{ background: STATUS_COLOR[status], color: "var(--on-accent)" }}>
-      {STATUS_LABEL[status]}
+    <span className={`px-tag ${state === "on_trial" ? "pulse-step" : ""}`} style={{ background: STATE_COLOR[state], color: "var(--on-accent)" }}>
+      {STATE_LABEL[state]}
     </span>
   );
 }

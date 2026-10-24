@@ -82,7 +82,8 @@ export function buildPacket(charge: Charge, allEvents: Event[], opts: PacketOpti
       totalSteps: lastStep,
       errorsInWindow: errors.length,
       distinctErrors: [...new Set(errors)],
-      lastError: errors.at(-1) ?? null,
+      // The engine reports failing tests in run_tests' result rather than in error.
+      lastError: errors.at(-1) ?? recent.filter((e) => e.result && /fail|error/i.test(e.result)).at(-1)?.result ?? null,
       repeatedCalls,
       stepsSinceProgress: lastStep - bestStep,
     },

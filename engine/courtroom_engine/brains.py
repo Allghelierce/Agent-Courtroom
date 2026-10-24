@@ -13,26 +13,12 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from .tasks import Task
+from .costs import model_rates, price_usage
 
-# USD per million tokens: input, output, cache write (5 min), cache read.
-PRICING = {
-    "claude-opus-5-5": (4.00, 20.00, 5.00, 0.20),
-    "claude-sonnet-5-5": (2.00, 10.00, 2.50, 0.20),
-    "claude-haiku-5-5": (0.10, 0.50, 0.125, 0.01),
-    # Groq lists these two; cached input is billed at the full input rate here to stay conservative.
-    "openai/gpt-oss-120b": (0.15, 0.60, 0.15, 0.15),
-    "openai/gpt-oss-20b": (0.075, 0.30, 0.075, 0.075),
-}
 GROQ_OUTPUT_BUDGET_CHARS = 12000  # recent tool output the Groq worker sees in full (~3K tokens)
 GROQ_MAX_OUTPUT_CHARS = 3000  # cap on any single tool output
 
 DEFAULT_MODELS = {"claude": "claude-opus-5-5", "groq": "openai/gpt-oss-120b", "scripted": "claude-opus-5-5"}
-
-
-def prices(model: str) -> tuple[float, float, float, float]:
-    if model not in PRICING:
-        raise ValueError(f"no price for {model}; add it to PRICING in brains.py")
-    return PRICING[model]
 
 
 def court_order(instruction: str) -> str:
@@ -46,6 +32,9 @@ class Action:
     tokens: int = 0
     cost_usd: float = 0.0
     text: str = ""
+    usage: dict[str, Any] = field(default_factory=dict)
+    model: str = "scripted"
+    cost_complete: bool = True
     error: Optional[str] = None  # the model asked for a tool call the API couldn't parse
 
 
@@ -53,21 +42,12 @@ class ClaudeBrain:
     def __init__(self, task: Task, model: str = "claude-opus-5-5", effort: str = "medium"):
         import anthropic
 
-        self.client = anthropic.Anthropic()
+        self.client = anthropic.Anthropic(max_retries=0, timeout=60.0)
         self.task = task
         self.model = model
         self.effort = effort
         self.messages: list[dict[str, Any]] = [{"role": "user", "content": task.prompt}]
         self._pending_tool_id: Optional[str] = None
-
-    def _cost(self, usage) -> float:
-        price_in, price_out, price_write, price_read = prices(self.model)
-        return (
-            usage.input_tokens * price_in
-            + usage.output_tokens * price_out
-            + (usage.cache_creation_input_tokens or 0) * price_write
-            + (usage.cache_read_input_tokens or 0) * price_read
-        ) / 1_000_000
 
     def next_action(self) -> Action:
         response = self.client.beta.messages.create(
@@ -90,18 +70,20 @@ class ClaudeBrain:
             + (usage.cache_creation_input_tokens or 0)
             + (usage.cache_read_input_tokens or 0)
         )
-        cost = self._cost(usage)
+        usage_record = usage.model_dump()
+        cost = price_usage(response.model, usage_record)
+        accounting = {"usage": usage_record, "model": response.model, "cost_complete": cost is not None}
         # Append the full content (thinking blocks included) so the history stays append-only.
         self.messages.append({"role": "assistant", "content": response.content})
         text = " ".join(b.text for b in response.content if b.type == "text").strip()
 
         if response.stop_reason == "refusal":
-            return Action(tool=None, tokens=tokens, cost_usd=cost, text=f"refused: {text}")
+            return Action(tool=None, tokens=tokens, cost_usd=cost or 0, text=f"refused: {text}", **accounting)
         tool_use = next((b for b in response.content if b.type == "tool_use"), None)
         if tool_use is None:
-            return Action(tool=None, tokens=tokens, cost_usd=cost, text=text)
+            return Action(tool=None, tokens=tokens, cost_usd=cost or 0, text=text, **accounting)
         self._pending_tool_id = tool_use.id
-        return Action(tool=tool_use.name, args=dict(tool_use.input), tokens=tokens, cost_usd=cost, text=text)
+        return Action(tool=tool_use.name, args=dict(tool_use.input), tokens=tokens, cost_usd=cost or 0, text=text, **accounting)
 
     def observe(self, output: str, is_error: bool, instruction: Optional[str] = None, summary: str = "") -> None:
         content: list[dict[str, Any]] = [
@@ -119,10 +101,13 @@ class GroqBrain:
         import groq
 
         self.groq = groq
-        self.client = groq.Groq(max_retries=5, timeout=90.0)  # the free tier rate-limits; the SDK backs off and retries
+        self.client = groq.Groq(max_retries=5, timeout=90.0)  # preserve A's free-tier retry behavior
         self.task = task
         self.model = model
-        self.price_in, self.price_out, _, _ = prices(model)
+        rates = model_rates(model)
+        if rates is None:
+            raise ValueError(f"No price for model {model}; update shared/model-prices.json")
+        self.price_in, self.price_out = rates[:2]
         self.tools = [
             {
                 "type": "function",
@@ -172,7 +157,7 @@ class GroqBrain:
             if "tool_use_failed" not in str(e):
                 raise
             self._pending = None
-            return Action(tool="invalid_tool_call", error=f"Malformed tool call: {str(e)[:300]}")
+            return Action(tool="invalid_tool_call", error=f"Malformed tool call: {str(e)[:300]}", model=self.model, cost_complete=False)
         except self.groq.APIStatusError as e:
             if e.status_code == 413:
                 raise RuntimeError(f"Request too large for Groq's per-minute token limit: {e}") from e
@@ -180,6 +165,7 @@ class GroqBrain:
 
         usage = response.usage
         cost = (usage.prompt_tokens * self.price_in + usage.completion_tokens * self.price_out) / 1_000_000
+        accounting = {"usage": usage.model_dump(), "model": response.model, "cost_complete": response.model == self.model}
         message = response.choices[0].message
         calls = message.tool_calls or []
         self.messages.append({
@@ -192,7 +178,7 @@ class GroqBrain:
         })
         text = (message.content or "").strip()
         if not calls:
-            return Action(tool=None, tokens=usage.total_tokens, cost_usd=cost, text=text)
+            return Action(tool=None, tokens=usage.total_tokens, cost_usd=cost, text=text, **accounting)
 
         # One tool call per step. Every call still needs a reply, so the extras are declined.
         first, extras = calls[0], calls[1:]
@@ -210,8 +196,8 @@ class GroqBrain:
                 raise ValueError("arguments must be a JSON object")
         except ValueError as e:
             return Action(tool=first.function.name, tokens=usage.total_tokens, cost_usd=cost, text=text,
-                          error=f"Tool arguments were not valid JSON: {e}")
-        return Action(tool=first.function.name, args=args, tokens=usage.total_tokens, cost_usd=cost, text=text)
+                          error=f"Tool arguments were not valid JSON: {e}", **accounting)
+        return Action(tool=first.function.name, args=args, tokens=usage.total_tokens, cost_usd=cost, text=text, **accounting)
 
     def observe(self, output: str, is_error: bool, instruction: Optional[str] = None, summary: str = "") -> None:
         if self._pending:
@@ -230,7 +216,10 @@ class ScriptedBrain:
 
     def __init__(self, task: Task, model: str = "claude-opus-5-5", step_delay: float = 0.0):
         self.step_delay = step_delay  # seconds per step, so a live dashboard has something to watch
-        self.price_in, self.price_out, _, _ = prices(model)
+        rates = model_rates(model)
+        if rates is None:
+            raise ValueError(f"No simulation price for model {model}")
+        self.price_in, self.price_out = rates[:2]
         self.script = task.make_script()
         self.plan = list(self.script.plan)
         self.steps = 0

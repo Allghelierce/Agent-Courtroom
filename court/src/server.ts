@@ -11,7 +11,7 @@ import { buildPacket, fromEnginePacket } from "./packet.ts";
 import type { Charge, EnginePacket, Event, Trial, Verdict } from "./types.ts";
 
 const PORT = Number(process.env.COURT_PORT ?? 4100);
-const CASES_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "cases");
+const CASES_DIR = process.env.COURT_CASES_DIR ?? join(dirname(fileURLToPath(import.meta.url)), "..", "cases");
 const MAX_BODY_BYTES = 5 * 1024 * 1024;
 
 const CORS = {
@@ -108,4 +108,4 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log(`court listening on http://localhost:${PORT}`));
+server.listen(PORT, process.env.COURT_HOST ?? "127.0.0.1", () => console.log(`court listening on http://localhost:${PORT}`));

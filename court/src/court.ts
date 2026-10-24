@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { mockArgument, mockVerdict } from "./mock.ts";
 import { findPrecedents, renderPrecedents } from "./precedent.ts";
@@ -11,19 +12,26 @@ import type { Argument, EvidencePacket, Side, Trial, Verdict } from "./types.ts"
 export const LAWYER_MODEL = process.env.COURT_LAWYER_MODEL ?? "claude-haiku-5-5";
 export const JUDGE_MODEL = process.env.COURT_JUDGE_MODEL ?? "claude-opus-5-5";
 
-// USD per million tokens (input, output). Haiku 5.5 rate is for prompts under 100K tokens,
-// which court prompts always are.
-const PRICES: Record<string, [number, number]> = {
-  "claude-haiku-5-5": [0.1, 0.5],
-  "claude-sonnet-5-5": [2, 10],
-  "claude-opus-5-5": [4, 20],
-  "claude-opus-5": [5, 25],
-  "claude-fable-5-1": [10, 50],
+const PRICES = JSON.parse(readFileSync(new URL("../../shared/model-prices.json", import.meta.url), "utf8")) as {
+  verifiedAt: string; models: Record<string, number[]>; haikuLongContextThreshold: number; haikuLongContextRates: number[];
 };
 
-export function costOf(model: string, usage: { input_tokens: number; output_tokens: number }): number {
-  const [i, o] = PRICES[model] ?? PRICES[JUDGE_MODEL] ?? [0, 0];
-  return (usage.input_tokens * i + usage.output_tokens * o) / 1_000_000;
+type Usage = { input_tokens: number; output_tokens: number; cache_creation_input_tokens?: number | null; cache_read_input_tokens?: number | null; cache_creation?: { ephemeral_1h_input_tokens?: number } | null };
+
+export function costOf(model: string, usage: Usage): number | null {
+  const key = PRICES.models[model] ? model : model.replace(/-\d{8}$/, "");
+  const writes = usage.cache_creation_input_tokens ?? 0;
+  const reads = usage.cache_read_input_tokens ?? 0;
+  const hour = usage.cache_creation?.ephemeral_1h_input_tokens ?? 0;
+  const long = key === "claude-haiku-5-5" && usage.input_tokens + writes + reads > PRICES.haikuLongContextThreshold;
+  const rates = long ? PRICES.haikuLongContextRates : PRICES.models[key];
+  if (!rates) return null;
+  return (usage.input_tokens * rates[0] + usage.output_tokens * rates[1] + (writes - hour) * rates[2] + hour * rates[3] + reads * rates[4]) / 1_000_000;
+}
+
+function accounting(model: string, usage: Usage) {
+  const cost = costOf(model, usage);
+  return { costUsd: cost ?? 0, costComplete: cost !== null };
 }
 
 const ArgumentSchema = z.object({
@@ -61,7 +69,7 @@ export async function convene(packet: EvidencePacket, opts: CourtOptions = {}): 
 export async function holdTrial(packet: EvidencePacket, opts: CourtOptions = {}): Promise<Trial> {
   const startedAt = new Date().toISOString();
   const mock = useMock(opts);
-  const client = mock ? undefined : (opts.client ?? new Anthropic());
+  const client = mock ? undefined : (opts.client ?? new Anthropic({ maxRetries: 0, timeout: 60_000 }));
   const evidence = renderPacket(packet);
   const validIds = new Set(packet.events.map((e) => e.id));
 
@@ -73,9 +81,9 @@ export async function holdTrial(packet: EvidencePacket, opts: CourtOptions = {})
 
   const precedents = opts.past?.length ? findPrecedents(packet, opts.past) : [];
 
-  const { verdict, costUsd: judgeCost } = client
+  const judged = client
     ? await judge(client, evidence, prosecution, defense, validIds, renderPrecedents(precedents))
-    : { verdict: mockVerdict(packet), costUsd: 0 };
+    : { verdict: mockVerdict(packet), costUsd: 0, costComplete: true, model: "mock", usage: undefined };
 
   const trial: Trial = {
     id: `case-${randomUUID().slice(0, 8)}`,
@@ -83,10 +91,13 @@ export async function holdTrial(packet: EvidencePacket, opts: CourtOptions = {})
     charge: packet.charge,
     prosecution,
     defense,
-    verdict,
+    verdict: judged.verdict,
     precedents: precedents.map((t) => t.id),
-    judgeModel: mock ? "mock" : JUDGE_MODEL,
-    costUsd: round(prosecution.costUsd + defense.costUsd + judgeCost),
+    judgeModel: judged.model,
+    judgeUsage: judged.usage,
+    costUsd: round(prosecution.costUsd + defense.costUsd + judged.costUsd),
+    costComplete: (prosecution.costComplete ?? mock) && (defense.costComplete ?? mock) && judged.costComplete,
+    pricingDate: PRICES.verifiedAt,
     startedAt,
     finishedAt: new Date().toISOString(),
     mock,
@@ -96,6 +107,8 @@ export async function holdTrial(packet: EvidencePacket, opts: CourtOptions = {})
 }
 
 async function argue(client: Anthropic, side: Side, evidence: string, validIds: Set<number>): Promise<Argument> {
+  let spend = { costUsd: 0, costComplete: false };
+  let usage: Record<string, unknown> | undefined;
   try {
     const res = await client.messages.parse({
       model: LAWYER_MODEL,
@@ -104,6 +117,8 @@ async function argue(client: Anthropic, side: Side, evidence: string, validIds: 
       messages: [{ role: "user", content: `EVIDENCE PACKET\n\n${evidence}\n\nMake your argument.` }],
       output_config: { effort: "low", format: zodOutputFormat(ArgumentSchema) },
     });
+    spend = accounting(res.model, res.usage);
+    usage = { ...res.usage };
     const out = res.parsed_output;
     if (res.stop_reason === "refusal" || !out) throw new Error(`no argument (stop_reason: ${res.stop_reason})`);
     return {
@@ -111,10 +126,11 @@ async function argue(client: Anthropic, side: Side, evidence: string, validIds: 
       model: res.model,
       argument: out.argument,
       cited_events: out.cited_events.filter((id) => validIds.has(id)),
-      costUsd: costOf(res.model, res.usage),
+      ...spend,
+      usage,
     };
   } catch (err) {
-    return { side, model: LAWYER_MODEL, argument: `The ${side} rests without argument (court error: ${String(err)}).`, cited_events: [], costUsd: 0 };
+    return { side, model: LAWYER_MODEL, argument: `The ${side} rests without argument (court error: ${String(err)}).`, cited_events: [], ...spend, usage };
   }
 }
 
@@ -125,9 +141,12 @@ async function judge(
   defense: Argument,
   validIds: Set<number>,
   precedents = "",
-): Promise<{ verdict: Verdict; costUsd: number }> {
+): Promise<{ verdict: Verdict; costUsd: number; costComplete: boolean; model: string; usage?: Record<string, unknown> }> {
   const prior = precedents ? `\n\n${precedents}\n(Earlier rulings on similar charges. Follow them only where this case's evidence is truly alike.)` : "";
   const content = `EVIDENCE PACKET\n\n${evidence}${prior}\n\nPROSECUTION ARGUES:\n${prosecution.argument}\n\nDEFENSE ARGUES:\n${defense.argument}\n\nIssue your verdict.`;
+  let spend = { costUsd: 0, costComplete: false };
+  let usage: Record<string, unknown> | undefined;
+  let model = JUDGE_MODEL;
   try {
     const res = await client.beta.messages.parse({
       model: JUDGE_MODEL,
@@ -138,13 +157,18 @@ async function judge(
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
     });
+    spend = accounting(res.model, res.usage);
+    usage = { ...res.usage };
+    model = res.model;
     const out = res.parsed_output;
     if (res.stop_reason === "refusal" || !out) throw new Error(`no verdict (stop_reason: ${res.stop_reason})`);
-    return { verdict: normalizeVerdict(out, validIds), costUsd: costOf(res.model, res.usage) };
+    return { verdict: normalizeVerdict(out, validIds), ...spend, model, usage };
   } catch (err) {
     return {
       verdict: { ruling: "escalate", reasoning: `The court could not reach a verdict (${String(err)}), so the case goes to a human.`, cited_events: [] },
-      costUsd: 0,
+      ...spend,
+      model,
+      usage,
     };
   }
 }

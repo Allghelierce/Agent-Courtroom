@@ -16,6 +16,7 @@ import threading
 from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 from .engine import Engine, RunConfig
 from .schema import Verdict
@@ -34,7 +35,12 @@ def _overrides(cfg: RunConfig, body: dict[str, Any]) -> RunConfig:
         "allMonitors": "all_monitors",
         "stepDelay": "step_delay",
     }
-    return replace(cfg, **{attr: body[key] for key, attr in fields.items() if key in body})
+    unknown = set(body) - set(fields)
+    if unknown:
+        raise ValueError(f"Unknown config fields: {', '.join(sorted(unknown))}")
+    result = replace(cfg, **{attr: body[key] for key, attr in fields.items() if key in body})
+    result.validate()
+    return result
 
 
 def make_handler(engine: Engine, defaults: RunConfig):
@@ -47,7 +53,7 @@ def make_handler(engine: Engine, defaults: RunConfig):
         def _cors(self) -> None:
             self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, Last-Event-ID")
 
         def _json(self, status: int, payload: Any) -> None:
             body = json.dumps(payload).encode()
@@ -60,9 +66,15 @@ def make_handler(engine: Engine, defaults: RunConfig):
 
         def _body(self) -> dict[str, Any]:
             length = int(self.headers.get("Content-Length") or 0)
+            if length < 0 or length > 1024 * 1024:
+                self.close_connection = True
+                raise ValueError("Body exceeds 1 MiB")
             if not length:
                 return {}
-            return json.loads(self.rfile.read(length))
+            body = json.loads(self.rfile.read(length))
+            if not isinstance(body, dict):
+                raise ValueError("Body must be a JSON object")
+            return body
 
         def do_OPTIONS(self):
             self.send_response(204)
@@ -71,30 +83,54 @@ def make_handler(engine: Engine, defaults: RunConfig):
             self.end_headers()
 
         def do_GET(self):
-            if self.path == "/stream":
-                return self._stream()
-            if self.path == "/history":
-                return self._json(200, engine.bus.history())
-            if self.path == "/workers":
-                return self._json(200, [w.status.to_json() for w in engine.workers.values()])
+            url = urlsplit(self.path)
+            if url.path in ("/stream", "/history"):
+                try:
+                    after = int(self.headers.get("Last-Event-ID") or parse_qs(url.query).get("after", ["0"])[0])
+                    if after < 0:
+                        raise ValueError()
+                except ValueError:
+                    return self._json(400, {"error": "Cursor must be a nonnegative integer"})
+                if url.path == "/stream":
+                    return self._stream(after)
+                return self._json(200, engine.bus.history(after))
+            if url.path == "/health":
+                return self._json(200, {"ok": True})
+            if url.path == "/workers":
+                return self._json(200, engine.bus.snapshots())
+            if url.path == "/cases":
+                return self._json(200, engine.bus.trials())
+            if url.path.startswith("/cases/"):
+                trial = next((t for t in engine.bus.trials() if t["id"] == url.path.rsplit("/", 1)[-1]), None)
+                return self._json(200, trial) if trial else self._json(404, {"error": "no such case"})
+            if url.path == "/comparisons":
+                return self._json(200, [m["data"] for m in engine.bus.history() if m["type"] == "comparison"])
             self._json(404, {"error": "not found"})
 
         def do_POST(self):
             try:
                 body = self._body()
-            except json.JSONDecodeError:
-                return self._json(400, {"error": "invalid JSON"})
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
             try:
                 if self.path == "/runs":
                     worker = engine.start_worker(_overrides(defaults, body))
                     return self._json(201, worker.status.to_json())
                 if self.path == "/compare":
                     cfg = _overrides(defaults, body)
-                    threading.Thread(target=engine.compare, args=(cfg,), daemon=True).start()
+                    if cfg.court == "none":
+                        raise ValueError("Comparison needs a court-enabled arm")
+                    engine.start_comparison(cfg)
                     return self._json(202, {"started": True})
             except ValueError as e:
                 return self._json(400, {"error": str(e)})
             parts = self.path.strip("/").split("/")
+            if len(parts) == 3 and parts[0] == "workers" and parts[2] == "cancel":
+                worker = engine.workers.get(parts[1])
+                if worker is None:
+                    return self._json(404, {"error": "no active worker"})
+                worker.cancel()
+                return self._json(202, {"cancellationRequested": True})
             if len(parts) == 3 and parts[0] == "workers" and parts[2] == "resolve":
                 worker = engine.workers.get(parts[1])
                 if worker is None:
@@ -110,20 +146,26 @@ def make_handler(engine: Engine, defaults: RunConfig):
                 return self._json(200, {"ok": True})
             self._json(404, {"error": "not found"})
 
-        def _stream(self):
+        def _stream(self, after: int = 0):
+            # The bus lock keeps replay and subscription atomic against publishers.
+            history, q = engine.bus.subscribe(after)
             self.send_response(200)
             self._cors()
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache")
             self.send_header("Connection", "keep-alive")
+            self.send_header("X-Accel-Buffering", "no")
             self.end_headers()
-            history, q = engine.bus.subscribe()
             try:
                 for message in history:
                     self._send_event(message)
                 while True:
                     try:
-                        self._send_event(q.get(timeout=HEARTBEAT_SECONDS))
+                        message = q.get(timeout=HEARTBEAT_SECONDS)
+                        if message is None:
+                            self.close_connection = True
+                            break
+                        self._send_event(message)
                     except queue.Empty:
                         self.wfile.write(b": heartbeat\n\n")
                         self.wfile.flush()
@@ -133,7 +175,7 @@ def make_handler(engine: Engine, defaults: RunConfig):
                 engine.bus.unsubscribe(q)
 
         def _send_event(self, message: dict[str, Any]) -> None:
-            self.wfile.write(f"data: {json.dumps(message)}\n\n".encode())
+            self.wfile.write(f"id: {message['sequence']}\ndata: {json.dumps(message)}\n\n".encode())
             self.wfile.flush()
 
     return Handler

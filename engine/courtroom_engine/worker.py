@@ -13,6 +13,7 @@ from .bus import Bus
 from .court import Court, build_packet
 from .schema import Charge, Event, Verdict, WorkerStatus
 from .tasks import Env, Task, ToolOutcome
+from .costs import PRICES
 
 HUMAN_WAIT_SECONDS = 600
 
@@ -48,6 +49,11 @@ class Worker:
         self.events: list[Event] = []
         self.window_start = 0  # monitors only see events after the last ruling
         self.started = 0.0
+        self.stopped = 0.0
+        self.brain_mode = "scripted"
+        self.case_ids: set[str] = set()
+        self.court_modes: set[str] = set()
+        self._cancelled = threading.Event()
         self.status = WorkerStatus(
             workerId=worker_id,
             state="running",
@@ -79,7 +85,19 @@ class Worker:
         self._publish_status()
 
     def elapsed_seconds(self) -> float:
-        return time.monotonic() - self.started
+        return (self.stopped or time.monotonic()) - self.started if self.started else 0.0
+
+    def result(self) -> dict:
+        status = self.status.to_json()
+        return {**status, "seconds": round(self.elapsed_seconds(), 3),
+                "workerCostUsd": round(self.status.costUsd, 6),
+                "totalCostUsd": round(self.status.costUsd + self.status.courtCostUsd, 6) if self.status.courtCostComplete and self.status.workerCostComplete else None,
+                "caseIds": sorted(self.case_ids), "courtModes": sorted(self.court_modes),
+                "outcomeVerified": False}
+
+    def cancel(self) -> None:
+        self._cancelled.set()
+        self._human_ready.set()
 
     # --- human escalation ---
 
@@ -94,20 +112,27 @@ class Worker:
 
     def run(self) -> WorkerStatus:
         self.started = time.monotonic()
-        env = self.task.make_env(self.seed)
+        self.status.costMode = "simulated" if self.brain_mode == "scripted" else "estimated_from_usage"
+        env = None
         try:
+            env = self.task.make_env(self.seed)
             self.status.testsPassing, self.status.testsTotal = env.baseline()
             self._publish_status()
             self._loop(env)
         except Exception as e:  # a crashed worker should still end its run cleanly
+            if self.brain_mode != "scripted":
+                self.status.workerCostComplete = False
             self._finish("failed", f"Worker crashed: {type(e).__name__}: {e}")
         finally:
-            if not self.keep_env:
+            self.stopped = time.monotonic()
+            if env is not None and not self.keep_env:
                 env.cleanup()
         return self.status
 
     def _loop(self, env: Env) -> None:
         while True:
+            if self._cancelled.is_set():
+                return self._finish("halted", "Cancelled by operator")
             if self.status.step >= self.max_steps:
                 return self._finish("failed", f"Hit the {self.max_steps}-step limit at {self._score()}")
             if self.status.costUsd >= self.budget_usd:
@@ -115,6 +140,10 @@ class Worker:
 
             action = self.brain.next_action()
             self.status.costUsd += action.cost_usd
+            self.status.workerCostComplete &= action.cost_complete
+            self.bus.publish("usage", {"workerId": self.id, "model": action.model, "usage": action.usage,
+                                       "costUsd": action.cost_usd if action.cost_complete else None,
+                                       "mode": self.status.costMode, "pricingDate": PRICES["verifiedAt"]})
 
             if action.tool is None:
                 self.status.testsPassing, self.status.testsTotal = env.baseline()
@@ -177,7 +206,21 @@ class Worker:
 
         self._set_state("on_trial")
         verdict = self.court.convene(build_packet(charge, self.events, self.budget_usd, self.task.prompt))
-        self._publish_verdict(charge, verdict)
+        trial = getattr(self.court, "last_trial", None)
+        case_id = getattr(self.court, "last_case_id", None)
+        if trial:
+            self.bus.publish("trial", trial)
+            if trial["id"] not in self.case_ids:
+                self.case_ids.add(trial["id"])
+                self.status.courtCostUsd += trial["costUsd"]
+            self.status.courtCostComplete &= trial.get("costComplete", True)
+            self.court_modes.add("mock" if trial.get("mock") else "live")
+        elif hasattr(self.court, "last_trial"):
+            self.status.courtCostComplete = False
+            self.court_modes.add("unknown")
+        else:
+            self.court_modes.add("stub")
+        self._publish_verdict(charge, verdict, case_id)
         if verdict.ruling == "escalate":
             verdict = self._wait_for_human(charge)
         if verdict.ruling != "halt":
@@ -185,8 +228,10 @@ class Worker:
         return verdict
 
     def _wait_for_human(self, charge: Charge) -> Verdict:
-        self._set_state("awaiting_human")
         self._human_ready.clear()
+        self._set_state("awaiting_human")
+        if self._cancelled.is_set():
+            self._human_ready.set()
         if self._human_ready.wait(HUMAN_WAIT_SECONDS) and self._human_verdict:
             verdict = self._human_verdict
         else:
@@ -194,8 +239,11 @@ class Worker:
         self._publish_verdict(charge, verdict)
         return verdict
 
-    def _publish_verdict(self, charge: Charge, verdict: Verdict) -> None:
-        self.bus.publish("verdict", {"workerId": self.id, "chargeId": charge.id, "verdict": verdict.to_json()})
+    def _publish_verdict(self, charge: Charge, verdict: Verdict, case_id: Optional[str] = None) -> None:
+        data = {"workerId": self.id, "chargeId": charge.id, "verdict": verdict.to_json()}
+        if case_id:
+            data["caseId"] = case_id
+        self.bus.publish("verdict", data)
 
     def _all_passing(self) -> bool:
         return self.status.testsTotal > 0 and self.status.testsPassing == self.status.testsTotal

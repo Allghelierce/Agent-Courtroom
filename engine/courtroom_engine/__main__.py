@@ -41,7 +41,10 @@ def console_printer(bus: Bus) -> None:
 
     def loop():
         while True:
-            print_message(q.get())
+            message = q.get()
+            if message is None:
+                return
+            print_message(message)
 
     threading.Thread(target=loop, daemon=True).start()
 
@@ -62,6 +65,7 @@ def main() -> None:
         p.add_argument("--step-delay", type=float, default=1.0 if name == "serve" else 0.0,
                        help="seconds per scripted step (default 1 for serve, 0 otherwise)")
         p.add_argument("--record", type=Path, help="write every stream message to this .jsonl file")
+        p.add_argument("--db", type=Path, help="SQLite history path; reuse for restart recovery")
         if name == "serve":
             p.add_argument("--host", default="127.0.0.1")
             p.add_argument("--port", type=int, default=8787)
@@ -79,8 +83,11 @@ def main() -> None:
         step_delay=args.step_delay,
         seed=args.seed.resolve() if args.seed else None,
     )
-    record = args.record or RUNS_DIR / f"{datetime.now():%Y%m%d-%H%M%S}-{args.command}.jsonl"
-    bus = Bus(record_path=record)
+    cfg.validate()
+    stamp = f"{datetime.now():%Y%m%d-%H%M%S-%f}"
+    record = args.record or RUNS_DIR / f"{stamp}-{args.command}.jsonl"
+    db = args.db or RUNS_DIR / ("events.sqlite" if args.command == "serve" else f"{stamp}-{args.command}.sqlite")
+    bus = Bus(record_path=record, db_path=db)
     engine = Engine(bus)
     console_printer(bus)
 
@@ -105,11 +112,17 @@ def main() -> None:
                 else:
                     row.append(str(s[key]))
             print(f"  {label:<14} {row[0]:<13} {row[1]}")
-        out = RUNS_DIR / "comparison.json"
+        RUNS_DIR.mkdir(parents=True, exist_ok=True)
+        out = RUNS_DIR / f"{result['id']}.json"
         out.write_text(json.dumps(result, indent=2))
+        print(f"\nCost mode: {result['costMode']}; success criteria pending human definition")
+        for side in ("withCourt", "withoutCourt"):
+            print(f"{side}: worker ${result[side]['workerCostUsd']:.4f}, court ${result[side]['courtCostUsd']:.4f}, total {result[side]['totalCostUsd']}")
         print(f"\nWrote {out}\nRecorded to {record}")
         return
 
+    if not 0 <= args.workers <= 5:
+        parser.error("--workers must be between 0 and 5")
     for _ in range(args.workers):
         engine.start_worker(cfg)
     serve(engine, cfg, args.host, args.port)

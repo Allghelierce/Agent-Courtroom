@@ -14,10 +14,12 @@ const WORKER_MOOD: Record<WorkerView["status"], Mood> = {
   new_plan: "neutral",
   needs_human: "worried",
   halted: "worried",
+  succeeded: "happy",
+  failed: "worried",
 };
 
 export default function Dashboard() {
-  const { trials, workers, source } = useCourtData();
+  const { trials, workers, source, comparisons } = useCourtData();
   const [selected, setSelected] = useState<string | null>(null);
   // Lead with the latest time the court stepped in; a "keep going" ruling only if there's nothing else.
   const latest = trials.findLast((t) => t.verdict.ruling !== "continue") ?? trials.at(-1);
@@ -36,7 +38,7 @@ export default function Dashboard() {
         <Stat label="Agent spend" value={usd(agentSpend)} />
         <Stat label="Court spend" value={usd(courtSpend)} />
         <Stat label="Trials held" value={String(trials.length)} />
-        <span className="ml-auto text-sm text-soft">{source === "live" ? "Live from the court server" : "Demo data (court server offline)"}</span>
+        <span className="ml-auto text-sm text-soft">{source === "live" ? "Live from the engine" : source === "disconnected" ? "Disconnected — showing last received data" : "Demo fixtures (engine offline)"}</span>
       </section>
 
       <section aria-labelledby="workers-h" className="flex flex-col gap-4">
@@ -48,6 +50,23 @@ export default function Dashboard() {
         </div>
       </section>
 
+      {comparisons.length > 0 && (
+        <section className="px-box flex flex-col gap-3 p-4" aria-label="Comparison">
+          <h2 className="text-[20px]">With court / without court</h2>
+          {comparisons.slice(-3).map((c) => (
+            <div key={c.id} className="overflow-x-auto">
+              <p className="text-sm">{c.task} · {c.costMode === "simulated" ? "Scripted demo — simulated worker costs" : "Model run — costs estimated from usage"}. Outcomes are engine-reported; evaluation criteria are pending.</p>
+              <table className="w-full text-left text-sm">
+                <thead><tr><th>Run</th><th>Outcome</th><th>Progress</th><th>Worker</th><th>Court</th><th>Total</th><th>Seconds</th></tr></thead>
+                <tbody>{(["withCourt", "withoutCourt"] as const).map((side) => {
+                  const r = c[side];
+                  return <tr key={side}><td>{side === "withCourt" ? "With court" : "Without court"}</td><td>{r.state}</td><td>{r.testsPassing}/{r.testsTotal}</td><td>{usd(r.workerCostUsd)}</td><td>{usd(r.courtCostUsd ?? 0)}{r.courtCostComplete === false ? " + unknown" : ""}</td><td>{r.totalCostUsd === null ? "Incomplete" : usd(r.totalCostUsd)}</td><td>{r.seconds}</td></tr>;
+                })}</tbody>
+              </table>
+            </div>
+          ))}
+        </section>
+      )}
       <ActivityFeed workers={workers} trials={trials} only={selected} onClear={() => setSelected(null)} />
     </div>
   );
@@ -117,7 +136,7 @@ function WorkerCard({ worker: w, selected, onSelect }: { worker: WorkerView; sel
 
       <div className="flex flex-col gap-1">
         <div className="flex justify-between text-sm">
-          <span>Spend</span>
+          <span>{w.costMode === "simulated" ? "Simulated spend" : "Spend"}</span>
           <span>{usd(w.spendUsd)} of {usd(w.budgetUsd)}</span>
         </div>
         <Meter value={w.spendUsd} max={w.budgetUsd} cells={20} color={overBudget > 0.8 ? "var(--red)" : "var(--gold)"} label={`${w.id} spend`} />

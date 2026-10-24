@@ -7,8 +7,10 @@ engine run end to end without it.
 from __future__ import annotations
 
 import json
+import math
 import urllib.error
 import urllib.request
+import urllib.parse
 from typing import Any, Protocol
 
 from .schema import Charge, Event, Verdict
@@ -52,11 +54,15 @@ class StubCourt:
 class HttpCourt:
     """POSTs the packet to Person B's court and parses the Verdict it returns."""
 
-    def __init__(self, url: str, timeout: float = 180.0):
+    def __init__(self, url: str, timeout: float = 60.0):
         self.url = url
         self.timeout = timeout
+        self.last_trial = None
+        self.last_case_id = None
 
     def convene(self, packet: dict[str, Any]) -> Verdict:
+        self.last_trial = None
+        self.last_case_id = None
         request = urllib.request.Request(
             self.url,
             data=json.dumps(packet).encode(),
@@ -65,8 +71,27 @@ class HttpCourt:
         )
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                return Verdict.from_json(json.load(response))
-        except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as e:
+                result = Verdict.from_json(json.load(response))
+                self.last_case_id = response.headers.get("X-Case-Id")
+            valid_ids = {event["id"] for event in packet["events"]}
+            if not set(result.cited_events).issubset(valid_ids):
+                raise ValueError("verdict cites events outside the packet")
+            if self.last_case_id:
+                try:
+                    case_url = urllib.parse.urljoin(self.url, "/cases/" + urllib.parse.quote(self.last_case_id, safe=""))
+                    with urllib.request.urlopen(case_url, timeout=min(self.timeout, 5)) as response:
+                        trial = json.load(response)
+                    cost = trial.get("costUsd")
+                    if (trial.get("id") != self.last_case_id or trial.get("workerId") != packet["charge"]["workerId"]
+                            or trial.get("charge", {}).get("id") != packet["charge"].get("id")
+                            or isinstance(cost, bool) or not isinstance(cost, (int, float)) or not math.isfinite(cost) or cost < 0):
+                        raise ValueError("invalid trial identity or cost")
+                    self.last_trial = trial
+                except (OSError, ValueError, TypeError, AttributeError):
+                    # A valid verdict still applies; the missing accounting is explicitly incomplete.
+                    pass
+            return result
+        except (OSError, ValueError, TypeError, AttributeError) as e:
             # No usable ruling: hand the case to a human instead of guessing.
             return Verdict(
                 ruling="escalate",

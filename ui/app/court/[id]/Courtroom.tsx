@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import { CourtScene } from "@/components/CourtScene";
 import { RulingTag } from "@/components/Pieces";
 import { Portrait } from "@/components/Sprites";
-import { COURT_URL, KIND_LABEL, RULING_COLOR, RULING_LABEL, describeEvent, eventFailed, repoFor, runFor, useCourtData, usd, type Trial } from "@/lib/data";
+import { ENGINE_URL, KIND_LABEL, RULING_COLOR, RULING_LABEL, describeEvent, eventFailed, repoFor, runFor, useCourtData, usd, type Trial, type Run } from "@/lib/data";
 import { buildScript } from "@/lib/script";
 import { CAST } from "@/lib/sprites";
 
@@ -27,7 +27,7 @@ function useReducedMotion(): boolean {
 
 export function Courtroom() {
   const { id } = useParams<{ id: string }>();
-  const { trials, loading } = useCourtData(10000);
+  const { trials, loading, workers, source } = useCourtData();
   const [fetched, setFetched] = useState<Trial | null>(null);
   const listed = trials.find((t) => t.id === id);
   const trial = listed ?? fetched;
@@ -35,7 +35,7 @@ export function Courtroom() {
   // A case that isn't in the list yet (just convened) can still be opened directly.
   useEffect(() => {
     if (listed || loading) return;
-    fetch(`${COURT_URL}/cases/${encodeURIComponent(id)}`, { signal: AbortSignal.timeout(2000) })
+    fetch(`${ENGINE_URL}/cases/${encodeURIComponent(id)}`, { signal: AbortSignal.timeout(2000) })
       .then((r) => (r.ok ? r.json() : null))
       .then((t: Trial | null) => t && setFetched(t))
       .catch(() => {});
@@ -50,12 +50,13 @@ export function Courtroom() {
       </div>
     );
   }
-  return <Trial key={trial.id} trial={trial} />;
+  const worker = workers.find((w) => w.id === trial.workerId);
+  const run = worker ? { budgetUsd: worker.budgetUsd, events: worker.events } : source === "demo" ? runFor(trial.workerId) : undefined;
+  return <Trial key={trial.id} trial={trial} run={run} />;
 }
 
-function Trial({ trial }: { trial: Trial }) {
+function Trial({ trial, run }: { trial: Trial; run?: Run }) {
   const script = useMemo(() => buildScript(trial), [trial]);
-  const run = runFor(trial.workerId);
   const [idx, setIdx] = useState(0);
   // How much of which line has been typed; a new line starts at 0 without resetting state in an effect.
   const [typed, setTyped] = useState({ idx: 0, n: 0 });

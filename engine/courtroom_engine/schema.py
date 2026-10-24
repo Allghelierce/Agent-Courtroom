@@ -60,15 +60,25 @@ class Verdict:
 
     @classmethod
     def from_json(cls, d: dict[str, Any]) -> "Verdict":
+        if not isinstance(d, dict):
+            raise ValueError("verdict must be an object")
         ruling = d.get("ruling")
         if ruling not in ("continue", "change_strategy", "escalate", "halt"):
             raise ValueError(f"invalid ruling: {ruling!r}")
-        if ruling == "change_strategy" and not d.get("instruction"):
+        instruction = d.get("instruction")
+        if instruction is not None and not isinstance(instruction, str):
+            raise ValueError("instruction must be a string")
+        if ruling == "change_strategy" and not (instruction and instruction.strip()):
             raise ValueError("change_strategy verdict needs an instruction")
+        cited = d.get("cited_events", [])
+        if not isinstance(cited, list) or any(type(e) is not int for e in cited):
+            raise ValueError("cited_events must be an array of integer IDs")
+        if not isinstance(d.get("reasoning", ""), str):
+            raise ValueError("reasoning must be a string")
         return cls(
             ruling=ruling,
             reasoning=str(d.get("reasoning", "")),
-            cited_events=[int(e) for e in d.get("cited_events", [])],
+            cited_events=cited,
             instruction=d.get("instruction"),
         )
 
@@ -87,6 +97,10 @@ class WorkerStatus:
     startedAt: str
     endedAt: Optional[str] = None
     summary: Optional[str] = None
+    courtCostUsd: float = 0.0
+    courtCostComplete: bool = True
+    costMode: str = "simulated"
+    workerCostComplete: bool = True
 
     def to_json(self) -> dict[str, Any]:
         return _drop_none(asdict(self))

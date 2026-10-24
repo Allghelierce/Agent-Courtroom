@@ -15,7 +15,7 @@ export default function CaseLog() {
           <h1 className="text-[28px]">Case log</h1>
           <p className="m-0">Every trial the court has held, newest first. Open one to replay it.</p>
         </div>
-        <span className="text-sm text-soft">{source === "live" ? "Live from the court server" : "Demo data (court server offline)"}</span>
+        <span className="text-sm text-soft">{source === "live" ? "Live from the engine" : source === "disconnected" ? "Disconnected — showing last received data" : "Demo fixtures (engine offline)"}</span>
       </div>
 
       {newest.length === 0 ? (

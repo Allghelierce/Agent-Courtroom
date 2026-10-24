@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Charge, ChargeKind, Event, Ruling, Trial, Verdict } from "@court/types";
+import type { ComparisonResult, StreamMessage, WorkerStatus as EngineWorkerStatus } from "../../shared/schema";
 import loopingRun from "@/data/runs/looping-run.json";
 import stallingRun from "@/data/runs/stalling-run.json";
 import overspendRun from "@/data/runs/overspend-run.json";
@@ -21,6 +22,7 @@ const DEMO_RUNS = [loopingRun, stallingRun, overspendRun, falseAlarmRun] as Run[
 const DEMO_TRIALS = ([loopingCase, stallingCase, overspendCase, falseAlarmCase] as Trial[]).toSorted((a, b) => a.startedAt.localeCompare(b.startedAt));
 
 export const COURT_URL = process.env.NEXT_PUBLIC_COURT_URL ?? "http://localhost:4100";
+export const ENGINE_URL = process.env.NEXT_PUBLIC_ENGINE_URL ?? "http://localhost:8787";
 
 // The fixtures don't name their repos yet, so the dashboard labels them here.
 const REPOS: Record<string, string> = {
@@ -30,7 +32,7 @@ const REPOS: Record<string, string> = {
   "worker-06": "search-indexer",
 };
 
-export type WorkerStatus = "working" | "on_trial" | "new_plan" | "needs_human" | "halted";
+export type WorkerStatus = "working" | "on_trial" | "new_plan" | "needs_human" | "halted" | "succeeded" | "failed";
 
 export type WorkerView = {
   id: string;
@@ -43,6 +45,7 @@ export type WorkerView = {
   trials: Trial[]; // oldest first
   status: WorkerStatus;
   lights: ChargeKind[]; // monitors that fired and haven't been cleared by a "continue" ruling
+  costMode?: string;
 };
 
 const STATUS_BY_RULING: Record<Ruling, WorkerStatus> = {
@@ -77,46 +80,69 @@ export function buildWorkers(runs: Run[], trials: Trial[]): WorkerView[] {
 export type CourtData = {
   trials: Trial[];
   workers: WorkerView[];
-  source: "live" | "demo";
+  source: "live" | "demo" | "disconnected";
   loading: boolean;
+  comparisons: ComparisonResult[];
 };
 
-async function fetchTrials(): Promise<Trial[] | null> {
-  try {
-    const res = await fetch(`${COURT_URL}/cases`, { signal: AbortSignal.timeout(1500) });
-    if (!res.ok) return null;
-    const body = (await res.json()) as Trial[];
-    return Array.isArray(body) && body.length > 0 ? body : null;
-  } catch {
-    return null;
-  }
-}
-
-// Uses the live court server when it's up and has cases, and the bundled demo cases otherwise.
-// Polls so a trial convened during the demo shows up without a reload.
-export function useCourtData(pollMs = 4000): CourtData {
+// The engine replays durable history on connect. EventSource sends Last-Event-ID on reconnect.
+export function useCourtData(): CourtData {
   const [state, setState] = useState<CourtData>(() => ({
     trials: DEMO_TRIALS,
     workers: buildWorkers(DEMO_RUNS, DEMO_TRIALS),
     source: "demo",
     loading: true,
+    comparisons: [],
   }));
 
   useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      const live = await fetchTrials();
-      if (!alive) return;
-      const trials = live ?? DEMO_TRIALS;
-      setState({ trials, workers: buildWorkers(DEMO_RUNS, trials), source: live ? "live" : "demo", loading: false });
+    const statuses = new Map<string, EngineWorkerStatus>();
+    const events = new Map<number, Event>();
+    const charges = new Map<string, Charge>();
+    const trials = new Map<string, Trial>();
+    const comparisons = new Map<string, ComparisonResult>();
+    const stream = new EventSource(`${ENGINE_URL}/stream`);
+    let connected = false;
+    let lastSequence = 0;
+    const render = () => {
+      const list = [...trials.values()].sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+      const workers: WorkerView[] = [...statuses.values()].map((s) => {
+        const mine = [...events.values()].filter((e) => e.workerId === s.workerId).sort((a, b) => a.step - b.step);
+        const cases = list.filter((t) => t.workerId === s.workerId);
+        const status: WorkerStatus = s.state === "running" ? "working" : s.state === "awaiting_human" ? "needs_human" : s.state;
+        return { id: s.workerId, repo: s.task.includes("price") ? "price collector" : "checkout",
+          events: mine, budgetUsd: s.budgetUsd, spendUsd: s.costUsd,
+          testsPassing: s.testsPassing, testsTotal: s.testsTotal, trials: cases, status,
+          lights: charges.has(s.workerId) ? [charges.get(s.workerId)!.kind] : [], costMode: s.costMode };
+      });
+      setState({ trials: list, workers, comparisons: [...comparisons.values()], source: "live", loading: false });
     };
-    load();
-    const timer = setInterval(load, pollMs);
+    stream.onopen = () => {
+      connected = true;
+      render();
+    };
+    stream.onmessage = (event) => {
+      let message: StreamMessage;
+      try { message = JSON.parse(event.data) as StreamMessage; } catch { return; }
+      if (message.sequence && message.sequence <= lastSequence) return;
+      lastSequence = message.sequence ?? lastSequence;
+      switch (message.type) {
+        case "worker": statuses.set(message.data.workerId, message.data); break;
+        case "event": events.set(message.data.id, message.data); break;
+        case "charge": charges.set(message.data.workerId, message.data); break;
+        case "trial": trials.set(message.data.id, message.data); break;
+        case "verdict":
+          if (["continue", "change_strategy"].includes(message.data.verdict.ruling)) charges.delete(message.data.workerId);
+          break;
+        case "comparison": comparisons.set(message.data.id, message.data); break;
+      }
+      render();
+    };
+    stream.onerror = () => setState((s) => ({ ...s, source: connected ? "disconnected" : "demo", loading: false }));
     return () => {
-      alive = false;
-      clearInterval(timer);
+      stream.close();
     };
-  }, [pollMs]);
+  }, []);
 
   return state;
 }
@@ -151,6 +177,8 @@ export const STATUS_LABEL: Record<WorkerStatus, string> = {
   new_plan: "New plan",
   needs_human: "Needs a human",
   halted: "Halted",
+  succeeded: "Tests complete",
+  failed: "Failed",
 };
 
 // Role colours carry meaning (ART.md): green healthy, red trouble, gold verdict, amber needs a human, soft stopped.
@@ -160,6 +188,8 @@ export const STATUS_COLOR: Record<WorkerStatus, string> = {
   new_plan: "var(--gold)",
   needs_human: "var(--amber)",
   halted: "var(--soft)",
+  succeeded: "var(--green)",
+  failed: "var(--red)",
 };
 
 export const RULING_COLOR: Record<Ruling, string> = {

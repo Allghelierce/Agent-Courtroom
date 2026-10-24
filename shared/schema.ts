@@ -75,8 +75,8 @@ export type WorkerStatus = {
 };
 
 export type ComparisonResult = {
-  withCourt: WorkerStatus;
-  withoutCourt: WorkerStatus;
+  withCourt: WorkerStatus & { seconds: number };
+  withoutCourt: WorkerStatus & { seconds: number };
 };
 
 export type StreamMessage =

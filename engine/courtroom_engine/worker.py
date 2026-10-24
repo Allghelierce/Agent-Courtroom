@@ -1,0 +1,204 @@
+"""The worker loop: one tool call per step, monitors after every step, court on a charge."""
+
+from __future__ import annotations
+
+import threading
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+from . import monitors
+from .brains import TASK
+from .bus import Bus
+from .court import Court, build_packet
+from .sandbox import Sandbox
+from .schema import Charge, Event, Verdict, WorkerStatus
+
+HUMAN_WAIT_SECONDS = 600
+
+
+def now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+
+
+class Worker:
+    def __init__(
+        self,
+        worker_id: str,
+        brain,
+        seed_repo: Path,
+        bus: Bus,
+        court: Optional[Court],
+        budget_usd: float = 2.0,
+        max_steps: int = 60,
+        enabled_monitors=monitors.MVP_MONITORS,
+        keep_sandbox: bool = False,
+    ):
+        self.id = worker_id
+        self.brain = brain
+        self.seed_repo = seed_repo
+        self.bus = bus
+        self.court = court
+        self.budget_usd = budget_usd
+        self.max_steps = max_steps
+        self.enabled_monitors = enabled_monitors
+        self.keep_sandbox = keep_sandbox
+        self.events: list[Event] = []
+        self.window_start = 0  # monitors only see events after the last ruling
+        self.started = 0.0
+        self.status = WorkerStatus(
+            workerId=worker_id,
+            state="running",
+            task=TASK,
+            courtEnabled=court is not None,
+            step=0,
+            testsPassing=0,
+            testsTotal=0,
+            costUsd=0.0,
+            budgetUsd=budget_usd,
+            startedAt=now(),
+        )
+        self._human_verdict: Optional[Verdict] = None
+        self._human_ready = threading.Event()
+
+    # --- status helpers ---
+
+    def _publish_status(self) -> None:
+        self.bus.publish("worker", self.status.to_json())
+
+    def _set_state(self, state: str) -> None:
+        self.status.state = state
+        self._publish_status()
+
+    def _finish(self, state: str, summary: str) -> None:
+        self.status.state = state
+        self.status.summary = summary
+        self.status.endedAt = now()
+        self._publish_status()
+
+    def elapsed_seconds(self) -> float:
+        return time.monotonic() - self.started
+
+    # --- human escalation ---
+
+    def resolve(self, verdict: Verdict) -> bool:
+        if self.status.state != "awaiting_human":
+            return False
+        self._human_verdict = verdict
+        self._human_ready.set()
+        return True
+
+    # --- main loop ---
+
+    def run(self) -> WorkerStatus:
+        self.started = time.monotonic()
+        sandbox = Sandbox(self.seed_repo)
+        try:
+            baseline = sandbox.run_tests()
+            self.status.testsPassing, self.status.testsTotal = baseline.tests or (0, 0)
+            self._publish_status()
+            self._loop(sandbox)
+        except Exception as e:  # a crashed worker should still end its run cleanly
+            self._finish("failed", f"Worker crashed: {type(e).__name__}: {e}")
+        finally:
+            if not self.keep_sandbox:
+                sandbox.cleanup()
+        return self.status
+
+    def _loop(self, sandbox: Sandbox) -> None:
+        while True:
+            if self.status.step >= self.max_steps:
+                return self._finish("failed", f"Hit the {self.max_steps}-step limit at {self._score()}")
+            if self.status.costUsd >= self.budget_usd:
+                return self._finish("failed", f"Ran out of budget (${self.budget_usd:.2f}) at {self._score()}")
+
+            action = self.brain.next_action()
+            self.status.costUsd += action.cost_usd
+
+            if action.tool is None:
+                final = sandbox.run_tests()
+                self.status.testsPassing, self.status.testsTotal = final.tests or (0, 0)
+                if self._all_passing():
+                    return self._finish("succeeded", f"All {self.status.testsTotal} tests pass. {action.text}".strip())
+                return self._finish("failed", f"Worker stopped at {self._score()}: {action.text}".strip())
+
+            outcome = sandbox.execute(action.tool, action.args)
+            if outcome.tests:
+                self.status.testsPassing, self.status.testsTotal = outcome.tests
+            self.status.step += 1
+            event = Event(
+                id=self.bus.next_event_id(),
+                workerId=self.id,
+                step=self.status.step,
+                tool=action.tool,
+                args=action.args,
+                tokens=action.tokens,
+                costUsd=round(action.cost_usd, 6),
+                testsPassing=self.status.testsPassing,
+                testsTotal=self.status.testsTotal,
+                timestamp=now(),
+                error=outcome.error,
+                result=outcome.summary,
+            )
+            self.events.append(event)
+            self.bus.publish("event", event.to_json())
+            self._publish_status()
+
+            if action.tool == "run_tests" and self._all_passing():
+                return self._finish(
+                    "succeeded", f"All {self.status.testsTotal} tests pass after {self.status.step} steps"
+                )
+
+            instruction = None
+            verdict = self._check_monitors()
+            if verdict is not None:
+                if verdict.ruling == "halt":
+                    return self._finish("halted", f"Court halted the run at {self._score()}: {verdict.reasoning}")
+                if verdict.ruling == "change_strategy":
+                    instruction = verdict.instruction
+            self.brain.observe(outcome.output, outcome.error is not None, instruction)
+
+    def _check_monitors(self) -> Optional[Verdict]:
+        finding = monitors.check(self.events[self.window_start :], self.budget_usd, self.enabled_monitors)
+        if finding is None:
+            return None
+        charge = Charge(
+            id=self.bus.next_charge_id(),
+            workerId=self.id,
+            kind=finding.kind,
+            summary=finding.summary,
+            eventIds=finding.eventIds,
+        )
+        self.bus.publish("charge", charge.to_json())
+        self.window_start = len(self.events)
+        if self.court is None:
+            return None  # without a court the warning light flashes and nobody acts
+
+        self._set_state("on_trial")
+        verdict = self.court.convene(build_packet(charge, self.events, self.budget_usd, TASK))
+        self._publish_verdict(charge, verdict)
+        if verdict.ruling == "escalate":
+            verdict = self._wait_for_human(charge)
+        if verdict.ruling != "halt":
+            self._set_state("running")
+        return verdict
+
+    def _wait_for_human(self, charge: Charge) -> Verdict:
+        self._set_state("awaiting_human")
+        self._human_ready.clear()
+        if self._human_ready.wait(HUMAN_WAIT_SECONDS) and self._human_verdict:
+            verdict = self._human_verdict
+        else:
+            verdict = Verdict(ruling="halt", reasoning="No human responded to the escalation in time")
+        self._publish_verdict(charge, verdict)
+        return verdict
+
+    def _publish_verdict(self, charge: Charge, verdict: Verdict) -> None:
+        self.bus.publish("verdict", {"workerId": self.id, "chargeId": charge.id, "verdict": verdict.to_json()})
+
+    def _all_passing(self) -> bool:
+        return self.status.testsTotal > 0 and self.status.testsPassing == self.status.testsTotal
+
+    def _score(self) -> str:
+        return f"{self.status.testsPassing}/{self.status.testsTotal} tests passing"

@@ -12,7 +12,7 @@ from . import monitors
 from .bus import Bus
 from .court import Court, build_packet
 from .schema import Charge, Event, Verdict, WorkerStatus
-from .tasks import Env, Task
+from .tasks import Env, Task, ToolOutcome
 
 HUMAN_WAIT_SECONDS = 600
 
@@ -122,7 +122,10 @@ class Worker:
                     return self._finish("succeeded", f"Finished at {self._score()}. {action.text}".strip())
                 return self._finish("failed", f"Worker stopped at {self._score()}: {action.text}".strip())
 
-            outcome = env.execute(action.tool, action.args)
+            if action.error:
+                outcome = ToolOutcome(output=action.error, summary=action.error, error=action.error)
+            else:
+                outcome = env.execute(action.tool, action.args)
             if outcome.progress:
                 self.status.testsPassing, self.status.testsTotal = outcome.progress
             self.status.step += 1

@@ -52,9 +52,9 @@ def main() -> None:
     for name in ("run", "compare", "serve"):
         p = sub.add_parser(name)
         p.add_argument("--task", default="coding", choices=list(TASKS), help="which kind of worker")
-        p.add_argument("--brain", default="scripted", choices=["scripted", "claude"])
+        p.add_argument("--brain", default="scripted", choices=["scripted", "claude", "groq"])
         p.add_argument("--court", default="stub", help='"stub", "none", or a convene URL')
-        p.add_argument("--model", default="claude-opus-5-5")
+        p.add_argument("--model", help="worker model; defaults to claude-opus-5-5 or openai/gpt-oss-120b on groq")
         p.add_argument("--budget", type=float, default=2.0, help="USD per worker")
         p.add_argument("--max-steps", type=int, default=60)
         p.add_argument("--all-monitors", action="store_true", help="also run overspending and flailing")

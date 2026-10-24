@@ -1,6 +1,6 @@
 # Engine (Person A)
 
-The worker, the monitors, the seed repos, and the event stream. Python 3.12, standard library plus the `anthropic` SDK.
+The worker, the monitors, the seed repos, and the event stream. Python 3.12, standard library plus the `anthropic` and `groq` SDKs.
 
 ## Setup
 
@@ -31,15 +31,27 @@ Useful options (all commands):
 | Option | Default | Meaning |
 |---|---|---|
 | `--task` | `coding` | Which kind of worker: `coding` or `prices` (see below). Over HTTP, `POST /runs` takes `{"task": "prices"}`. |
-| `--brain` | `scripted` | `scripted` replays a realistic run with simulated costs and no API key. `claude` is the real agent (needs `ANTHROPIC_API_KEY`). |
+| `--brain` | `scripted` | `scripted` replays a realistic run with simulated costs and no API key. `groq` is a real agent on Groq (needs `GROQ_API_KEY`). `claude` is a real agent on Claude (needs `ANTHROPIC_API_KEY`). |
 | `--court` | `stub` | `stub` always rules `change_strategy`. `none` runs without a court. A URL sends the evidence packet to Person B's court. |
-| `--model` | `claude-opus-5-5` | Worker model, also used to price scripted steps. |
+| `--model` | `openai/gpt-oss-120b` on groq, `claude-opus-5-5` otherwise | Worker model, also used to price scripted steps. Prices live in `PRICING` in `brains.py`. |
 | `--budget` | `2.0` | USD per worker. |
 | `--max-steps` | `60` | |
 | `--all-monitors` | off | Adds the overspending and flailing monitors to looping and stalling. |
 | `--step-delay` | `1` for serve, `0` otherwise | Seconds per scripted step, so the dashboard has something to watch. |
 | `--seed` | the task's own | Point a task at different seed data. |
 | `--record` | `runs/<time>.jsonl` | Where to save every stream message. |
+
+## Running a real agent on Groq
+
+Get a free key at https://console.groq.com, then:
+
+```sh
+export GROQ_API_KEY=...
+.venv/bin/python -m courtroom_engine run --brain groq --task prices
+.venv/bin/python -m courtroom_engine compare --brain groq
+```
+
+Costs are computed from Groq's listed prices for `openai/gpt-oss-120b` ($0.15 in / $0.60 out per million tokens), so they are much smaller than the scripted run's simulated Claude costs. The free tier is rate-limited; the SDK backs off and retries. If the model writes a tool call Groq can't parse, the step is logged as `invalid_tool_call` with an error instead of crashing the run.
 
 ## Worker types
 

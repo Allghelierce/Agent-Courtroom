@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from . import monitors
-from .brains import ClaudeBrain, ScriptedBrain
+from .brains import DEFAULT_MODELS, ClaudeBrain, GroqBrain, ScriptedBrain
 from .bus import Bus
 from .court import HttpCourt, StubCourt
 from .tasks import TASKS, Task
@@ -20,9 +20,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 @dataclass
 class RunConfig:
     task: str = "coding"  # a key of tasks.TASKS
-    brain: str = "scripted"  # "scripted" or "claude"
+    brain: str = "scripted"  # "scripted", "claude", or "groq"
     court: str = "stub"  # "stub", "none", or the URL of Person B's convene endpoint
-    model: str = "claude-opus-5-5"
+    model: Optional[str] = None  # defaults per brain, see brains.DEFAULT_MODELS
     budget_usd: float = 2.0
     max_steps: int = 60
     all_monitors: bool = False
@@ -37,10 +37,15 @@ def get_task(name: str) -> Task:
 
 
 def make_brain(cfg: RunConfig, task: Task):
+    if cfg.brain not in DEFAULT_MODELS:
+        raise ValueError(f"unknown brain: {cfg.brain}")
+    model = cfg.model or DEFAULT_MODELS[cfg.brain]
     if cfg.brain == "claude":
-        return ClaudeBrain(task, model=cfg.model)
+        return ClaudeBrain(task, model=model)
+    if cfg.brain == "groq":
+        return GroqBrain(task, model=model)
     if cfg.brain == "scripted":
-        return ScriptedBrain(task, model=cfg.model, step_delay=cfg.step_delay)
+        return ScriptedBrain(task, model=model, step_delay=cfg.step_delay)
     raise ValueError(f"unknown brain: {cfg.brain}")
 
 

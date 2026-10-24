@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "sync-data": "node scripts/sync-data.mjs"
   },
   "dependencies": {
     "next": "16.4.3",

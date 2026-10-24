@@ -6,18 +6,19 @@ import loopingRun from "@/data/runs/looping-run.json";
 import stallingRun from "@/data/runs/stalling-run.json";
 import overspendRun from "@/data/runs/overspend-run.json";
 import falseAlarmRun from "@/data/runs/false-alarm-run.json";
-import caseA from "@/data/cases/case-b7b99653.json";
-import caseB from "@/data/cases/case-52db364b.json";
-import caseC from "@/data/cases/case-49a99ae3.json";
-import caseD from "@/data/cases/case-44ba7b30.json";
+import loopingCase from "@/data/cases/looping.json";
+import stallingCase from "@/data/cases/stalling.json";
+import overspendCase from "@/data/cases/overspend.json";
+import falseAlarmCase from "@/data/cases/false-alarm.json";
 
 export type { Charge, ChargeKind, Event, Ruling, Trial, Verdict };
 
-// A worker's run as the engine logs it. Bundled fixtures stand in until Person C's event server streams live runs.
+// A worker's run as the engine logs it. Bundled fixtures (refreshed with `npm run sync-data`) stand in
+// until Person C's event server streams live runs.
 export type Run = { budgetUsd: number; events: Event[]; charge?: Charge; verdict?: Verdict };
 
 const DEMO_RUNS = [loopingRun, stallingRun, overspendRun, falseAlarmRun] as Run[];
-const DEMO_TRIALS = ([caseA, caseB, caseC, caseD] as Trial[]).toSorted((a, b) => a.startedAt.localeCompare(b.startedAt));
+const DEMO_TRIALS = ([loopingCase, stallingCase, overspendCase, falseAlarmCase] as Trial[]).toSorted((a, b) => a.startedAt.localeCompare(b.startedAt));
 
 export const COURT_URL = process.env.NEXT_PUBLIC_COURT_URL ?? "http://localhost:4100";
 
@@ -178,9 +179,13 @@ export function clock(iso: string): string {
 
 export function describeEvent(e: Event): string {
   const path = typeof e.args.path === "string" ? e.args.path : "";
-  const patch = typeof e.args.patch === "string" ? e.args.patch : "";
-  if (e.tool === "run_tests") return `Ran ${path || "all tests"}`;
+  if (e.tool === "run_tests") return e.result ? `Ran the tests: ${e.result}` : "Ran the tests";
   if (e.tool === "read_file") return `Read ${path}`;
-  if (e.tool === "edit_file") return `Edited ${path}${patch ? `: ${patch}` : ""}`;
-  return `${e.tool} ${path}`.trim();
+  if (e.tool === "edit_file") return `Edited ${path}`;
+  return e.result ? `${e.tool}: ${e.result}` : e.tool;
+}
+
+// The engine reports test failures in a run_tests result and tool failures in `error`.
+export function eventFailed(e: Event): boolean {
+  return Boolean(e.error) || (e.tool === "run_tests" && e.testsPassing < e.testsTotal);
 }

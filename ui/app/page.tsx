@@ -5,7 +5,7 @@ import { useState } from "react";
 import { CourtScene } from "@/components/CourtScene";
 import { Meter, PixelIcon, RulingTag, StatusTag, WarningLights } from "@/components/Pieces";
 import { Chibi } from "@/components/Sprites";
-import { KIND_LABEL, clock, describeEvent, repoFor, useCourtData, usd, type Trial, type WorkerView } from "@/lib/data";
+import { KIND_LABEL, clock, describeEvent, eventFailed, repoFor, useCourtData, usd, type Trial, type WorkerView } from "@/lib/data";
 import type { Mood } from "@/lib/sprites";
 
 const WORKER_MOOD: Record<WorkerView["status"], Mood> = {
@@ -146,7 +146,7 @@ function ActivityFeed({ workers, trials, only, onClear }: { workers: WorkerView[
         at: e.timestamp,
         worker: w.id,
         text: `event ${e.id}: ${describeEvent(e)}${e.error ? `. ${e.error}` : ""}`,
-        tone: (e.error ? "error" : "event") as Row["tone"],
+        tone: (eventFailed(e) ? "error" : "event") as Row["tone"],
       })),
     ),
     ...trials.map((t) => ({

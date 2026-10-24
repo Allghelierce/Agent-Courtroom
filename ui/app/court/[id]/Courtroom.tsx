@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import { CourtScene } from "@/components/CourtScene";
 import { RulingTag } from "@/components/Pieces";
 import { Portrait } from "@/components/Sprites";
-import { COURT_URL, KIND_LABEL, RULING_COLOR, RULING_LABEL, describeEvent, repoFor, runFor, useCourtData, usd, type Trial } from "@/lib/data";
+import { COURT_URL, KIND_LABEL, RULING_COLOR, RULING_LABEL, describeEvent, eventFailed, repoFor, runFor, useCourtData, usd, type Trial } from "@/lib/data";
 import { buildScript } from "@/lib/script";
 import { CAST } from "@/lib/sprites";
 
@@ -173,7 +173,7 @@ function Trial({ trial }: { trial: Trial }) {
                     <span className="font-display">event {e.id}</span>
                     <span>{e.testsPassing}/{e.testsTotal} tests · {usd(e.costUsd)}</span>
                   </div>
-                  <span>{describeEvent(e)}</span>
+                  <span style={eventFailed(e) ? { color: "#b8264f" } : undefined}>{describeEvent(e)}</span>
                   {e.error && <span style={{ color: "#b8264f" }}>{e.error}</span>}
                 </li>
               ))}

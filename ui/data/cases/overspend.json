@@ -1,0 +1,52 @@
+{
+  "id": "case-cf969fc3",
+  "workerId": "worker-06",
+  "charge": {
+    "id": 1,
+    "workerId": "worker-06",
+    "kind": "overspending",
+    "summary": "Spent $0.47 of the $0.50 budget since the last ruling",
+    "eventIds": [
+      3,
+      4,
+      5,
+      6,
+      7
+    ]
+  },
+  "prosecution": {
+    "side": "prosecution",
+    "model": "mock",
+    "argument": "The worker has made the same run_tests call 2 times, at events 1, 5. Tests have not improved in 6 steps while spend reached $0.47, 94% of budget. The same failure keeps coming back: 6/12 passing; failing: test_delete_doc, test_query_phrase, test_rank_bm25, test_reindex_large, test_stem_plural, test_tokenize_unicode. The worker is going in circles, and the court should change its strategy before more money burns.",
+    "cited_events": [
+      1,
+      5
+    ],
+    "costUsd": 0
+  },
+  "defense": {
+    "side": "defense",
+    "model": "mock",
+    "argument": "The worker took the suite from 6 to 6 of 12 passing. The remaining failure is \"6/12 passing; failing: test_delete_doc, test_query_phrase, test_rank_bm25, test_reindex_large, test_stem_plural, test_tokenize_unicode\", an error the worker's code edits cannot fix. That progress is worth keeping. Redirect the worker; do not halt it.",
+    "cited_events": [],
+    "costUsd": 0
+  },
+  "verdict": {
+    "ruling": "halt",
+    "reasoning": "Spend is at 94% of budget with no recent progress, so further work is not worth the cost.",
+    "cited_events": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7
+    ]
+  },
+  "precedents": [],
+  "judgeModel": "mock",
+  "costUsd": 0,
+  "startedAt": "2026-10-24T22:15:35.782Z",
+  "finishedAt": "2026-10-24T22:15:35.783Z",
+  "mock": true
+}

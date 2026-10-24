@@ -157,7 +157,7 @@ class Worker:
                     return self._finish("halted", f"Court halted the run at {self._score()}: {verdict.reasoning}")
                 if verdict.ruling == "change_strategy":
                     instruction = verdict.instruction
-            self.brain.observe(outcome.output, outcome.error is not None, instruction)
+            self.brain.observe(outcome.output, outcome.error is not None, instruction, summary=outcome.summary)
 
     def _check_monitors(self) -> Optional[Verdict]:
         finding = monitors.check(self.events[self.window_start :], self.budget_usd, self.enabled_monitors)

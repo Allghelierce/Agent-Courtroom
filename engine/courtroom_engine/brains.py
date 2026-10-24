@@ -23,6 +23,9 @@ PRICING = {
     "openai/gpt-oss-120b": (0.15, 0.60, 0.15, 0.15),
     "openai/gpt-oss-20b": (0.075, 0.30, 0.075, 0.075),
 }
+GROQ_OUTPUT_BUDGET_CHARS = 12000  # recent tool output the Groq worker sees in full (~3K tokens)
+GROQ_MAX_OUTPUT_CHARS = 3000  # cap on any single tool output
+
 DEFAULT_MODELS = {"claude": "claude-opus-5-5", "groq": "openai/gpt-oss-120b", "scripted": "claude-opus-5-5"}
 
 
@@ -100,7 +103,7 @@ class ClaudeBrain:
         self._pending_tool_id = tool_use.id
         return Action(tool=tool_use.name, args=dict(tool_use.input), tokens=tokens, cost_usd=cost, text=text)
 
-    def observe(self, output: str, is_error: bool, instruction: Optional[str] = None) -> None:
+    def observe(self, output: str, is_error: bool, instruction: Optional[str] = None, summary: str = "") -> None:
         content: list[dict[str, Any]] = [
             {"type": "tool_result", "tool_use_id": self._pending_tool_id, "content": output, "is_error": is_error}
         ]
@@ -116,7 +119,7 @@ class GroqBrain:
         import groq
 
         self.groq = groq
-        self.client = groq.Groq(max_retries=5)  # the free tier rate-limits; the SDK backs off and retries
+        self.client = groq.Groq(max_retries=5, timeout=90.0)  # the free tier rate-limits; the SDK backs off and retries
         self.task = task
         self.model = model
         self.price_in, self.price_out, _, _ = prices(model)
@@ -132,15 +135,36 @@ class GroqBrain:
             {"role": "user", "content": task.prompt},
         ]
         self._pending: Optional[str] = None  # id of the tool call we executed this step
+        self._pending_key = ""
+        # (index in messages, tool + args, one-line summary) for every tool output, oldest first
+        self._outputs: list[tuple[int, str, str]] = []
+
+    def _request_messages(self) -> list[dict[str, Any]]:
+        # Groq's free tier caps tokens per minute (8K for gpt-oss-120b), so a history that resends
+        # every file and test log soon can't fit in one request. Going newest first, outputs stay
+        # whole until the budget runs out; older ones, and older copies of a repeated call, shrink
+        # to their one-line summary.
+        trimmed, seen, used = {}, set(), 0
+        for i, key, summary in reversed(self._outputs):
+            size = len(self.messages[i]["content"])
+            if key in seen or used + size > GROQ_OUTPUT_BUDGET_CHARS:
+                trimmed[i] = summary
+            else:
+                used += size
+            seen.add(key)
+        return [
+            {**m, "content": f"[older output trimmed] {trimmed[i]}"} if i in trimmed else m
+            for i, m in enumerate(self.messages)
+        ]
 
     def next_action(self) -> Action:
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
-                messages=self.messages,
+                messages=self._request_messages(),
                 tools=self.tools,
                 tool_choice="auto",
-                max_completion_tokens=8192,
+                max_completion_tokens=4096,  # may count against the per-minute token limit
             )
         except self.groq.BadRequestError as e:
             # Groq rejects tool calls the model wrote as invalid JSON. Log it as a failed step so
@@ -149,6 +173,10 @@ class GroqBrain:
                 raise
             self._pending = None
             return Action(tool="invalid_tool_call", error=f"Malformed tool call: {str(e)[:300]}")
+        except self.groq.APIStatusError as e:
+            if e.status_code == 413:
+                raise RuntimeError(f"Request too large for Groq's per-minute token limit: {e}") from e
+            raise
 
         usage = response.usage
         cost = (usage.prompt_tokens * self.price_in + usage.completion_tokens * self.price_out) / 1_000_000
@@ -175,6 +203,7 @@ class GroqBrain:
                 "content": "Not run: make one tool call at a time. Ask for it again if you still need it.",
             })
         self._pending = first.id
+        self._pending_key = f"{first.function.name} {first.function.arguments}"
         try:
             args = json.loads(first.function.arguments or "{}")
             if not isinstance(args, dict):
@@ -184,8 +213,11 @@ class GroqBrain:
                           error=f"Tool arguments were not valid JSON: {e}")
         return Action(tool=first.function.name, args=args, tokens=usage.total_tokens, cost_usd=cost, text=text)
 
-    def observe(self, output: str, is_error: bool, instruction: Optional[str] = None) -> None:
+    def observe(self, output: str, is_error: bool, instruction: Optional[str] = None, summary: str = "") -> None:
         if self._pending:
+            self._outputs.append((len(self.messages), self._pending_key, summary or output[:200]))
+            if len(output) > GROQ_MAX_OUTPUT_CHARS:
+                output = "[start trimmed]\n" + output[-GROQ_MAX_OUTPUT_CHARS:]
             self.messages.append({"role": "tool", "tool_call_id": self._pending, "content": output})
         else:
             self.messages.append({"role": "user", "content": f"{output}\nTry again with a valid tool call."})
@@ -230,7 +262,7 @@ class ScriptedBrain:
         self.trap_index += 1
         return self._priced(tool, args, self.script.trap_text)
 
-    def observe(self, output: str, is_error: bool, instruction: Optional[str] = None) -> None:
+    def observe(self, output: str, is_error: bool, instruction: Optional[str] = None, summary: str = "") -> None:
         if not instruction or self.recovering or self.finished:
             return
         self.plan = []

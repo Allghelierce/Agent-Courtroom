@@ -54,7 +54,7 @@ export function mockVerdict(p: EvidencePacket): Verdict {
   if (p.charge.kind === "flailing" && p.stats.errorsInWindow >= 5) {
     return { ruling: "escalate", reasoning: `The worker hit ${p.stats.errorsInWindow} errors in its recent steps without a clear way forward, so a human should decide.`, cited_events: cited };
   }
-  const external = err && /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|network|unreachable/i.test(err);
+  const external = err && /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EHOSTUNREACH|connection refused|URLError|timed out|network|unreachable/i.test(err);
   const instruction = external
     ? "Stop editing the code for the failing test. The external API it calls is unreachable: mock that API in the test, mark the test for human review, and finish the rest of the suite."
     : "Stop repeating the last change. Re-read the failing test's assertion, try a different fix, and if it still fails after one attempt, skip the test and flag it for human review.";

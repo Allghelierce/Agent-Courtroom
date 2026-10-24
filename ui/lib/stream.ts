@@ -1,40 +1,16 @@
-import type { Charge, Event, Trial, Verdict } from "@court/types";
+import type { Event, Trial } from "@court/types";
 import demoStream from "@/data/stream-demo.json";
 import demoTrials from "@/data/stream-trials.json";
+import type { ComparisonResult, StreamMessage, WorkerResult, WorkerState, WorkerStatus } from "@shared/schema";
 
-// Mirrors the StreamMessage union in shared/schema.ts (origin/Amelia), which the engine's GET /stream sends.
 
-export type WorkerState = "running" | "on_trial" | "awaiting_human" | "succeeded" | "halted" | "failed";
-
-export type WorkerStatus = {
-  workerId: string;
-  state: WorkerState;
-  task: string;
-  courtEnabled: boolean;
-  step: number;
-  testsPassing: number;
-  testsTotal: number;
-  costUsd: number;
-  budgetUsd: number;
-  startedAt: string;
-  endedAt?: string;
-  summary?: string;
-  seconds?: number;
-};
-
-export type Comparison = { withCourt: WorkerStatus; withoutCourt: WorkerStatus };
-
-export type VerdictMessage = { workerId: string; chargeId: number; verdict: Verdict };
-
-export type StreamMessage =
-  | { type: "worker"; data: WorkerStatus }
-  | { type: "event"; data: Event }
-  | { type: "charge"; data: Charge }
-  | { type: "verdict"; data: VerdictMessage }
-  | { type: "comparison"; data: Comparison };
+// The engine's stream contract lives in shared/schema.ts; the UI uses it as is.
+export type { ComparisonResult, StreamMessage, WorkerResult, WorkerState, WorkerStatus };
+export type VerdictMessage = Extract<StreamMessage, { type: "verdict" }>["data"];
 
 // The bundled demo (refreshed with `npm run sync-data`): the court's 4-worker stream, and a mock trial per charge.
-export const DEMO_STREAM = demoStream as StreamMessage[];
+// It predates some newer fields (sequence, cost breakdowns, a comparison id), so readers treat those as optional.
+export const DEMO_STREAM = demoStream as unknown as StreamMessage[];
 export const DEMO_TRIALS = demoTrials as Trial[];
 
 export function demoTrialId(workerId: string, chargeId: number): string {
@@ -69,3 +45,18 @@ export const DEMO_EVENTS: Event[] = DEMO_STREAM.flatMap((m) => (m.type === "even
 export const DEMO_FINAL: Record<string, WorkerStatus> = Object.fromEntries(
   DEMO_STREAM.flatMap((m) => (m.type === "worker" && m.data.endedAt ? [[m.data.workerId, m.data]] : [])),
 );
+
+// A comparison run's money, tolerating older streams that only report costUsd.
+export function runCosts(r: WorkerResult): { worker: number; court?: number; courtComplete: boolean; total: number | null } {
+  const worker = r.workerCostUsd ?? r.costUsd;
+  const total = r.totalCostUsd === undefined ? r.costUsd : r.totalCostUsd;
+  return { worker, court: r.courtCostUsd, courtComplete: r.courtCostComplete !== false, total };
+}
+
+export function savings(c: ComparisonResult): { usd: number; percent: number } | null {
+  if (c.savingsUsd !== undefined && c.savingsUsd !== null) return { usd: c.savingsUsd, percent: c.savingsPercent ?? 0 };
+  const a = runCosts(c.withCourt).total;
+  const b = runCosts(c.withoutCourt).total;
+  if (a === null || b === null || b === 0) return null;
+  return { usd: b - a, percent: ((b - a) / b) * 100 };
+}

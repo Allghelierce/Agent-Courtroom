@@ -2,14 +2,12 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 import type { Charge, Event, Trial } from "@court/types";
-import { COURT_URL, KIND_LABEL, RULING_LABEL, describeEvent, eventFailed } from "./data";
-import { DEMO_GAPS, DEMO_STREAM, DEMO_TRIALS, demoTrialId, type Comparison, type StreamMessage, type VerdictMessage, type WorkerStatus } from "./stream";
+import { COURT_URL, ENGINE_URL, KIND_LABEL, RULING_LABEL, describeEvent, eventFailed } from "./data";
+import { DEMO_GAPS, DEMO_STREAM, DEMO_TRIALS, demoTrialId, type ComparisonResult, type StreamMessage, type VerdictMessage, type WorkerStatus } from "./stream";
 
-// One live picture of every worker, built from StreamMessages. It comes from the engine's SSE stream when that's
-// running, and from an in-browser replay of the bundled demo otherwise. It lives in the root layout, so the run
-// keeps going while you watch a trial.
-
-const STREAM_URL = process.env.NEXT_PUBLIC_STREAM_URL ?? "http://localhost:8787/stream";
+// One live picture of every worker, built from StreamMessages (shared/schema.ts). It comes from the engine's SSE
+// stream when that's running, and from an in-browser replay of the bundled demo otherwise. It lives in the root
+// layout, so the run keeps going while you watch a trial.
 
 export type LiveWorker = { status: WorkerStatus; events: Event[]; charges: Charge[]; rulings: VerdictMessage[] };
 
@@ -28,17 +26,22 @@ type RunState = {
   feed: FeedItem[];
   openCharges: Charge[];
   verdicts: VerdictMessage[];
-  comparison?: Comparison;
+  trials: Record<string, Trial>; // full trials the engine streamed
+  comparison?: ComparisonResult;
+  comparisonError?: string;
   lastAt: string;
+  lastSequence: number; // the engine's durable cursor; a reconnect replays history, so older messages are skipped
   seq: number;
 };
 
-const EMPTY: RunState = { workers: {}, order: [], feed: [], openCharges: [], verdicts: [], lastAt: "", seq: 0 };
+const EMPTY: RunState = { workers: {}, order: [], feed: [], openCharges: [], verdicts: [], trials: {}, lastAt: "", lastSequence: 0, seq: 0 };
 const FEED_MAX = 200;
 
 function apply(state: RunState, msg: StreamMessage | { type: "reset" }): RunState {
   if (msg.type === "reset") return EMPTY;
-  const seq = state.seq + 1;
+  if (msg.sequence !== undefined && msg.sequence <= state.lastSequence) return state;
+  const base = { ...state, seq: state.seq + 1, lastSequence: msg.sequence ?? state.lastSequence };
+  const seq = base.seq;
   const feed = (item: Omit<FeedItem, "seq" | "at">, at = state.lastAt) => [{ ...item, seq, at }, ...state.feed].slice(0, FEED_MAX);
   const worker = (id: string): LiveWorker =>
     state.workers[id] ?? {
@@ -55,9 +58,8 @@ function apply(state: RunState, msg: StreamMessage | { type: "reset" }): RunStat
       const w = worker(d.workerId);
       const ended = d.endedAt && !w.status.endedAt;
       return {
-        ...state,
+        ...base,
         ...put(d.workerId, { ...w, status: d }),
-        seq,
         lastAt: d.endedAt ?? state.lastAt,
         feed: ended ? feed({ workerId: d.workerId, tone: d.state === "succeeded" ? "done" : "fail", text: d.summary ?? d.state }, d.endedAt) : state.feed,
       };
@@ -66,9 +68,8 @@ function apply(state: RunState, msg: StreamMessage | { type: "reset" }): RunStat
       const e = msg.data;
       const w = worker(e.workerId);
       return {
-        ...state,
+        ...base,
         ...put(e.workerId, { ...w, events: [...w.events, e] }),
-        seq,
         lastAt: e.timestamp,
         feed: feed({ workerId: e.workerId, tone: eventFailed(e) ? "fail" : "event", text: `event ${e.id}: ${describeEvent(e)}` }, e.timestamp),
       };
@@ -77,9 +78,8 @@ function apply(state: RunState, msg: StreamMessage | { type: "reset" }): RunStat
       const c = msg.data;
       const w = worker(c.workerId);
       return {
-        ...state,
+        ...base,
         ...put(c.workerId, { ...w, charges: [...w.charges, c] }),
-        seq,
         openCharges: [...state.openCharges, c],
         feed: feed({ workerId: c.workerId, tone: "charge", text: `Monitor flagged ${KIND_LABEL[c.kind].toLowerCase()}. Court is in session.`, charge: { workerId: c.workerId, id: c.id ?? 0 } }),
       };
@@ -88,16 +88,21 @@ function apply(state: RunState, msg: StreamMessage | { type: "reset" }): RunStat
       const v = msg.data;
       const w = worker(v.workerId);
       return {
-        ...state,
+        ...base,
         ...put(v.workerId, { ...w, rulings: [...w.rulings, v] }),
-        seq,
         openCharges: state.openCharges.filter((c) => !(c.workerId === v.workerId && c.id === v.chargeId)),
         verdicts: [...state.verdicts, v],
         feed: feed({ workerId: v.workerId, tone: "verdict", text: `The court ruled: ${RULING_LABEL[v.verdict.ruling].toLowerCase()}.`, charge: { workerId: v.workerId, id: v.chargeId } }),
       };
     }
+    case "trial":
+      return { ...base, trials: { ...state.trials, [msg.data.id]: msg.data } };
     case "comparison":
-      return { ...state, seq, comparison: msg.data };
+      return { ...base, comparison: msg.data, comparisonError: undefined };
+    case "comparison_error":
+      return { ...base, comparisonError: msg.data.error };
+    default:
+      return base; // usage and anything newer: nothing to show yet
   }
 }
 
@@ -118,7 +123,7 @@ function useCourtCases(): Trial[] {
           if (alive && Array.isArray(body)) setCases(body);
         }
       } catch {
-        // offline: fall back to the bundled demo trials
+        // offline: the engine's streamed trials or the bundled demo stand in
       }
       // Poll often while the court is up; back off while it's down so the console stays quiet.
       if (alive) timer = setTimeout(load, up ? 4000 : 20000);
@@ -134,11 +139,12 @@ function useCourtCases(): Trial[] {
 
 // ---------- the provider ----------
 
-export type Source = "connecting" | "live" | "replay";
+export type Source = "connecting" | "live" | "disconnected" | "replay";
 
 type LiveValue = RunState & {
   source: Source;
   courtUp: boolean;
+  simulatedCosts: boolean; // a scripted run: worker spend is simulated, not billed
   playing: boolean;
   speed: number;
   progress: number; // 0..1 through the demo replay
@@ -162,18 +168,17 @@ export function LiveProvider({ children }: { children: ReactNode }) {
 
   // Try the engine's stream first; fall back to the bundled replay if it isn't up.
   useEffect(() => {
-    const es = new EventSource(STREAM_URL);
+    const es = new EventSource(`${ENGINE_URL}/stream`);
     let opened = false;
-    const fallback = () => {
+    const timer = setTimeout(() => {
       if (opened) return;
       es.close();
       setSource("replay");
-    };
-    const timer = setTimeout(fallback, 1500);
+    }, 1500);
     es.onopen = () => {
+      if (!opened) dispatch({ type: "reset" });
       opened = true;
       clearTimeout(timer);
-      dispatch({ type: "reset" }); // the server replays history on every connect
       setSource("live");
     };
     es.onmessage = (e) => {
@@ -183,7 +188,15 @@ export function LiveProvider({ children }: { children: ReactNode }) {
         // ignore a malformed line
       }
     };
-    es.onerror = fallback;
+    es.onerror = () => {
+      if (opened) {
+        setSource("disconnected"); // EventSource keeps retrying; onopen flips this back
+        return;
+      }
+      clearTimeout(timer);
+      es.close();
+      setSource("replay");
+    };
     return () => {
       clearTimeout(timer);
       es.close();
@@ -207,12 +220,20 @@ export function LiveProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<LiveValue>(() => {
-    const trialFor = (workerId: string, chargeId: number) =>
-      courtCases.find((t) => t.workerId === workerId && t.charge.id === chargeId) ?? DEMO_TRIALS.find((t) => t.id === demoTrialId(workerId, chargeId));
+    const streamed = Object.values(state.trials);
+    // A verdict names its case when the engine knows it; otherwise match on worker and charge.
+    const trialFor = (workerId: string, chargeId: number) => {
+      const caseId = state.verdicts.find((v) => v.workerId === workerId && v.chargeId === chargeId)?.caseId;
+      const match = (t: Trial) => (caseId ? t.id === caseId : t.workerId === workerId && t.charge.id === chargeId);
+      return streamed.find(match) ?? courtCases.find(match) ?? DEMO_TRIALS.find((t) => t.id === demoTrialId(workerId, chargeId));
+    };
+    const known = new Map<string, Trial>();
+    for (const t of [...courtCases, ...streamed]) known.set(t.id, t);
     return {
       ...state,
       source,
       courtUp: courtCases.length > 0,
+      simulatedCosts: Object.values(state.workers).some((w) => w.status.costMode === "simulated"),
       playing,
       speed,
       progress: index / DEMO_STREAM.length,
@@ -221,7 +242,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       restart,
       trialFor,
       runTrials: state.verdicts.flatMap((v) => trialFor(v.workerId, v.chargeId) ?? []),
-      caseLog: courtCases.length > 0 ? courtCases : DEMO_TRIALS,
+      caseLog: known.size > 0 ? [...known.values()].toSorted((a, b) => a.startedAt.localeCompare(b.startedAt)) : DEMO_TRIALS,
     };
   }, [state, source, courtCases, playing, speed, index, restart]);
 

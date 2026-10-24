@@ -2,15 +2,17 @@
 //   data/stream-demo.json    the StreamMessages, one array (the UI replays it in the browser)
 //   data/stream-trials.json  a full mock Trial for every charge in the stream
 //
-// A stream verdict carries only the ruling, so each trial is held by the court's own code in mock mode
-// on the events before the charge, then given the stream's verdict, which is what the worker acted on.
-// Run from ../court so tsx resolves the court's modules:  npm run sync-data
+// A stream verdict carries only the ruling, so each trial is held by the court's own code on the events
+// before the charge, then given the stream's verdict, which is what the worker acted on. Mock mode by
+// default; with --real the lawyers are real models (needs GROQ_API_KEY or ANTHROPIC_API_KEY).
+// Run from ../court so tsx resolves the court's modules:  npm run sync-data [-- --real]
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildPacket, holdTrial, type Charge, type Event, type Trial } from "../../court/src/index.ts";
 import type { StreamMessage } from "../../court/fixtures/replay.ts";
 
+const real = process.argv.includes("--real");
 const ui = join(dirname(fileURLToPath(import.meta.url)), "..");
 const streamPath = join(ui, "..", "court", "fixtures", "stream-demo-4workers.jsonl");
 
@@ -31,7 +33,7 @@ for (const msg of messages) {
     const filed = charges.get(`${workerId}:${chargeId}`);
     if (!filed) throw new Error(`verdict for unknown charge ${workerId}:${chargeId}`);
     const packet = buildPacket(filed.charge, filed.seen, { budgetUsd: budgets.get(workerId) ?? 1 });
-    const trial = await holdTrial(packet, { mock: true });
+    const trial = await holdTrial(packet, real ? {} : { mock: true });
     trials.push({ ...trial, id: `demo-${workerId}-${chargeId}`, verdict });
   }
 }

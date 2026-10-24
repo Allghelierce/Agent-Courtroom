@@ -1,17 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { CourtScene } from "@/components/CourtScene";
-import { RulingTag, StatusTag } from "@/components/Pieces";
+import { RulingChip } from "@/components/Console";
+import { StatusTag } from "@/components/Pieces";
 import { Portrait } from "@/components/Sprites";
-import { CHARGE_PHRASE, COURT_URL, RULING_COLOR, RULING_LABEL, describeEvent, eventFailed, usd, type Event, type Trial } from "@/lib/data";
+import { COURT_URL, ENGINE_URL, KIND_LABEL, RULING_COLOR, RULING_LABEL, describeEvent, eventFailed, usd, type Event, type Trial } from "@/lib/data";
 import { useLive } from "@/lib/live";
 import { buildScript, type Line } from "@/lib/script";
 import { blip, gavel, objection, setSoundEnabled } from "@/lib/sound";
 import { CAST } from "@/lib/sprites";
-import { DEMO_EVENTS, DEMO_FINAL, DEMO_TRIALS, type WorkerStatus } from "@/lib/stream";
+import { useCaseContext } from "@/lib/case";
+import { DEMO_TRIALS, type WorkerStatus } from "@/lib/stream";
+import { CaseRecord } from "./CaseRecord";
 
 const AUTO_DELAY_MS = 2600;
 const CUT_IN_MS = 1300;
@@ -32,48 +35,68 @@ function useReducedMotion(): boolean {
 
 export function Courtroom() {
   const { id } = useParams<{ id: string }>();
+  const view = useSearchParams().get("view") === "record" ? "record" : "replay";
   const live = useLive();
   const [lookup, setLookup] = useState<{ id: string; trial: Trial | null } | null>(null);
   const known = live.caseLog.find((t) => t.id === id) ?? live.runTrials.find((t) => t.id === id) ?? DEMO_TRIALS.find((t) => t.id === id);
   const trial = known ?? (lookup?.id === id ? lookup.trial : undefined);
 
-  // A case that isn't in the list yet (just convened) can still be opened directly.
+  // A case that isn't in the list yet (just convened) can still be opened directly: ask the court, then the engine.
   useEffect(() => {
     if (known) return;
-    fetch(`${COURT_URL}/cases/${encodeURIComponent(id)}`, { signal: AbortSignal.timeout(2000) })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((t: Trial | null) => setLookup({ id, trial: t }))
-      .catch(() => setLookup({ id, trial: null }));
+    const get = (base: string) =>
+      fetch(`${base}/cases/${encodeURIComponent(id)}`, { signal: AbortSignal.timeout(2000) })
+        .then((r) => (r.ok ? (r.json() as Promise<Trial>) : null))
+        .catch(() => null);
+    get(COURT_URL)
+      .then((t) => t ?? get(ENGINE_URL))
+      .then((t) => setLookup({ id, trial: t }));
   }, [id, known]);
 
   if (!trial) {
     const loading = trial === undefined;
     return (
-      <div className="px-box flex flex-col items-start gap-4 p-6">
-        <h1 className="text-[28px]">{loading ? "Calling the court to order..." : "No case with that number"}</h1>
-        {!loading && <p className="m-0">Case {id} isn&apos;t in the case log. Pick a trial from the list to watch it.</p>}
-        <Link href="/cases" className="px-btn">Open the case log</Link>
+      <div className="card flex flex-col items-start gap-3 p-6">
+        <h1 className="text-[20px]">{loading ? "Loading the case..." : "No case with that id"}</h1>
+        {!loading && <p className="m-0 text-c-soft">Case {id} isn&apos;t in the case log.</p>}
+        <Link href="/cases" className="btn">Open the case log</Link>
       </div>
     );
   }
-  return <TrialView key={trial.id} trial={trial} />;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-[13px] text-c-soft">
+            <Link href="/cases" className="no-underline hover:underline">Cases</Link> / {trial.id}
+          </span>
+          <h1 className="flex flex-wrap items-center gap-3 text-[24px]">
+            {trial.workerId}: {KIND_LABEL[trial.charge.kind].toLowerCase()}
+            <RulingChip ruling={trial.verdict.ruling} />
+          </h1>
+        </div>
+        <nav className="flex gap-1 rounded-lg p-1" style={{ background: "var(--c-panel)", border: "1px solid var(--c-line)" }} aria-label="Case views">
+          {(["replay", "record"] as const).map((v) => (
+            <Link
+              key={v}
+              href={v === "record" ? `/court/${trial.id}?view=record` : `/court/${trial.id}`}
+              aria-current={view === v ? "page" : undefined}
+              className="rounded-md px-3 py-1.5 text-[13px] font-medium no-underline"
+              style={{ background: view === v ? "var(--c-raise)" : undefined, color: view === v ? "var(--c-text)" : "var(--c-soft)" }}
+            >
+              {v === "replay" ? "Replay" : "Record"}
+            </Link>
+          ))}
+        </nav>
+      </div>
+      {view === "record" ? <CaseRecord key={trial.id} trial={trial} /> : trial.summary ? <SummaryJudgment trial={trial} /> : <TrialView key={trial.id} trial={trial} />}
+    </div>
+  );
 }
 
 function TrialView({ trial }: { trial: Trial }) {
-  const live = useLive();
-  const liveWorker = live.workers[trial.workerId];
-
-  // Events by id: what the run has streamed so far, plus the bundled demo so cited evidence always resolves.
-  const events = useMemo(() => {
-    const byId = new Map<number, Event>();
-    for (const e of DEMO_EVENTS) if (e.workerId === trial.workerId) byId.set(e.id, e);
-    for (const e of liveWorker?.events ?? []) byId.set(e.id, e);
-    return byId;
-  }, [trial.workerId, liveWorker?.events]);
-
-  // How the worker's run ended: from the live run once it ends, or from the bundled demo for demo cases.
-  const outcome: WorkerStatus | undefined = liveWorker?.status.endedAt ? liveWorker.status : trial.id.startsWith("demo-") ? DEMO_FINAL[trial.workerId] : undefined;
-
+  const { events, outcome } = useCaseContext(trial);
   const script = useMemo(() => buildScript(trial, outcome), [trial, outcome]);
   const [idx, setIdx] = useState(0);
   // How much of which line has been typed; a new line starts at 0 without resetting state in an effect.
@@ -173,17 +196,7 @@ function TrialView({ trial }: { trial: Trial }) {
   const evidence = (line.cites ?? []).flatMap((n) => events.get(n) ?? []);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <Link href="/cases" className="text-sm text-soft">Back to the case log</Link>
-          <h1 className="text-[28px]">
-            {trial.workerId} is charged with {CHARGE_PHRASE[trial.charge.kind]}
-          </h1>
-        </div>
-        <span className="text-sm text-soft">Case {trial.id}</span>
-      </div>
-
+    <div className="stage flex flex-col gap-6">
       <div key={cutIn ? idx : "stage"} className={`relative overflow-hidden border-4 border-edge bg-[#2a1d4a] ${cutIn ? "shake" : ""}`} style={{ boxShadow: "4px 4px 0 var(--shadow)" }}>
         <button type="button" onClick={advance} aria-label="Next line" className="block w-full cursor-pointer border-0 bg-transparent p-0">
           <CourtScene
@@ -226,7 +239,7 @@ function TrialView({ trial }: { trial: Trial }) {
 
       {reachedVerdict && <AfterVerdict trial={trial} outcome={outcome} events={events} />}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6">
         <section className="px-box flex flex-col gap-3 p-4" aria-labelledby="evidence-h">
           <h2 id="evidence-h" className="text-[20px]">Evidence</h2>
           {evidence.length === 0 ? (
@@ -240,19 +253,6 @@ function TrialView({ trial }: { trial: Trial }) {
           )}
         </section>
 
-        <section className="px-box flex flex-col gap-3 p-4" aria-labelledby="facts-h">
-          <h2 id="facts-h" className="text-[20px]">The case</h2>
-          <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-            <dt className="text-soft">Charge</dt>
-            <dd className="m-0">{trial.charge.summary}</dd>
-            <dt className="text-soft">Ruling</dt>
-            <dd className="m-0">{reachedVerdict ? <RulingTag ruling={trial.verdict.ruling} /> : "Waiting for the Judge"}</dd>
-            <dt className="text-soft">Court cost</dt>
-            <dd className="m-0">{usd(trial.costUsd)}{trial.mock ? " (mock run, no model calls)" : ""}</dd>
-            <dt className="text-soft">Models</dt>
-            <dd className="m-0">Prosecution {trial.prosecution.model}, defense {trial.defense.model}, judge {trial.judgeModel}</dd>
-          </dl>
-        </section>
       </div>
     </div>
   );
@@ -312,6 +312,40 @@ function VerdictStamp({ trial }: { trial: Trial }) {
         <div className="font-display text-sm">Verdict</div>
         <div className="font-display text-[28px] leading-none sm:text-[40px]">{RULING_LABEL[trial.verdict.ruling]}</div>
       </div>
+    </div>
+  );
+}
+
+export const SUMMARY_REASON: Record<NonNullable<Trial["summary"]>, string> = {
+  repeat_offender: "This worker has been charged before, so the court ruled on its record without hearing the case again.",
+  court_budget: "The court is over its own budget, so it ruled without paying for a trial.",
+};
+
+// Some charges are decided without a trial (court/src/rules.ts): a short card instead of the courtroom dialogue.
+function SummaryJudgment({ trial }: { trial: Trial }) {
+  return (
+    <div className="stage flex flex-col gap-6">
+      <section className="px-box flex flex-wrap items-start gap-6 p-6">
+        <div className="shrink-0 border-4 border-edge">
+          <Portrait who="judge" mood="neutral" scale={3} />
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
+          <span className="px-tag self-start" style={{ background: "var(--gold)", color: "var(--on-accent)" }}>Summary judgment</span>
+          <h2 className="text-[28px]">{RULING_LABEL[trial.verdict.ruling]}, no trial needed</h2>
+          <p className="m-0 text-[20px] leading-snug">{trial.summary ? SUMMARY_REASON[trial.summary] : ""}</p>
+          <p className="m-0">{trial.verdict.reasoning}</p>
+          {trial.priorCaseIds && trial.priorCaseIds.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span>Rests on</span>
+              {trial.priorCaseIds.map((id) => (
+                <Link key={id} href={`/court/${id}`} className="px-btn ghost">
+                  Case {id}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

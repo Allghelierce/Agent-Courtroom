@@ -4,6 +4,7 @@ import type { WorkerState } from "./stream";
 export type { Charge, ChargeKind, Event, Ruling, Trial, Verdict };
 
 export const COURT_URL = process.env.NEXT_PUBLIC_COURT_URL ?? "http://localhost:4100";
+export const ENGINE_URL = process.env.NEXT_PUBLIC_ENGINE_URL ?? "http://localhost:8787";
 
 // ---------- labels and formatting ----------
 

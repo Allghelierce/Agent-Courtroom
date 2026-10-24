@@ -1,6 +1,28 @@
 # Agent Courtroom art guide
 
-Read this before you touch anything visual. Every screen in `ui/` follows it, so the dashboard, the courtroom and the case log look like one game.
+Read this before you touch anything visual. The UI has two modes on purpose, and each has its own rules.
+
+## Two modes
+
+**The console is the product. The courtroom is how it explains itself.**
+
+| | Console (serious) | Stage (cute) |
+|---|---|---|
+| Where | Overview, Cases, a case's **Record** tab, the site header | A case's **Replay** tab: the courtroom, dialogue, cut-ins |
+| Job | Show that the system works: money saved, interventions, cost of oversight, evidence | Make one decision memorable and easy to follow |
+| Type | IBM Plex Sans, 13–15px body, 24–30px numbers, tabular figures | Pixelify Sans and DotGothic16 (below) |
+| Surfaces | `.card`, `.btn`, `.chip`, `table.data`: 1px `--c-line` borders, 6–8px radius, no shadows | `.px-box`, `.px-btn`, `.px-tag`: 4px borders, square corners, hard shadows |
+| Colour | `--c-*` neutrals; role colours only as small chips, bars and dots | The palette below, the scene, the characters |
+| Motion | None, except a soft pulse on "In session" | Everything in "Motion" below |
+
+Rules for keeping them apart:
+
+- Anything inside a `.stage` wrapper is pixel art; everything else is the console. Don't mix: no chibis or pixel fonts in the console, no Plex or rounded corners on the stage.
+- The console leads with outcomes and evidence, never with characters. Every case links to both views: **Record** (the audit) and **Replay** (the trial).
+- The one shared thread is the role colours. Gold, red, blue, green and amber mean the same thing in both modes, so a ruling chip in the console matches the stamp in the courtroom.
+- Charges decided without a trial (summary judgment: repeat offender, court over budget) get a short card in the Replay tab, not the full courtroom.
+
+The rest of this guide is about the stage.
 
 ## North star
 

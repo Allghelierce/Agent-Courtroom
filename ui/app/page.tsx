@@ -2,352 +2,407 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { CourtScene } from "@/components/CourtScene";
-import { Meter, PixelIcon, RulingTag, StatusTag, WarningLights } from "@/components/Pieces";
-import { Chibi } from "@/components/Sprites";
-import { CHARGE_PHRASE, clock, describeEvent, usd, type Charge, type Trial } from "@/lib/data";
+import { Bar, MONITORS, MonitorDots, RulingChip, Sparkline, StateChip } from "@/components/Console";
+import { CHARGE_PHRASE, KIND_LABEL, RULING_LABEL, STATE_LABEL, clock, usd, type Charge, type Ruling, type Trial } from "@/lib/data";
 import { useLive, type FeedItem, type LiveWorker } from "@/lib/live";
-import type { Mood } from "@/lib/sprites";
-import type { Comparison, WorkerStatus } from "@/lib/stream";
+import { runCosts, savings, type ComparisonResult, type WorkerState } from "@/lib/stream";
 
-export default function Dashboard() {
+// The console: the serious half of the UI (ART.md, "Two modes"). The courtroom replay is one click away on each case.
+
+export default function Overview() {
   const live = useLive();
   const [selected, setSelected] = useState<string | null>(null);
   const workers = live.order.map((id) => live.workers[id]);
-  // Lead with the latest time the court stepped in; a "keep going" ruling only if there's nothing else.
-  const latest = live.runTrials.findLast((t) => t.verdict.ruling !== "continue") ?? live.runTrials.at(-1);
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       {live.openCharges.map((c) => (
         <InSession key={`${c.workerId}-${c.id}`} charge={c} trial={live.trialFor(c.workerId, c.id ?? 0)} />
       ))}
 
-      {latest ? <LatestCase trial={latest} /> : <QuietCourt />}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-[24px]">Overview</h1>
+          <p className="m-0 text-c-soft">Code monitors check every step each worker takes. When one flags a worker, the court hears both sides and rules.</p>
+        </div>
+        <RunControls />
+      </div>
 
-      <RunBar />
+      <Kpis />
 
-      <ComparisonPanel comparison={live.comparison} />
-
-      <section aria-labelledby="workers-h" className="flex flex-col gap-4">
-        <h2 id="workers-h" className="text-[20px]">Workers</h2>
-        {workers.length === 0 ? (
-          <p className="px-box m-0 p-6 text-soft">Waiting for the first worker to start...</p>
-        ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {workers.map((w) => (
-              <WorkerCard key={w.status.workerId} worker={w} selected={selected === w.status.workerId} onSelect={() => setSelected(selected === w.status.workerId ? null : w.status.workerId)} />
-            ))}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <section className="card self-start overflow-x-auto" aria-labelledby="workers-h">
+          <div className="flex items-center gap-3 px-4 pt-4">
+            <h2 id="workers-h" className="text-[15px]">Workers</h2>
+            {live.simulatedCosts && <span className="chip">Simulated spend</span>}
           </div>
-        )}
-      </section>
+          {workers.length === 0 ? (
+            <p className="m-0 p-4 text-c-soft">Waiting for the first worker to start.</p>
+          ) : (
+            <table className="data mt-2">
+              <thead>
+                <tr>
+                  <th>Worker</th>
+                  <th>State</th>
+                  <th>Tests passing</th>
+                  <th>Spend</th>
+                  <th>Steps</th>
+                  <th>Monitors</th>
+                  <th>Last ruling</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workers.map((w) => (
+                  <WorkerRow key={w.status.workerId} worker={w} selected={selected === w.status.workerId} onSelect={() => setSelected(selected === w.status.workerId ? null : w.status.workerId)} />
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
 
-      <ActivityFeed only={selected} onClear={() => setSelected(null)} />
+        <div className="flex flex-col gap-6">
+          <ComparisonCard comparison={live.comparison} error={live.comparisonError} />
+          <section className="card flex flex-col gap-3 p-4" aria-labelledby="mon-h">
+            <h2 id="mon-h" className="text-[15px]">Monitors</h2>
+            <p className="m-0 text-[13px] text-c-soft">Plain code with no model calls, so watching costs nothing. Court only convenes when one fires.</p>
+            <ul className="m-0 flex list-none flex-col gap-2 p-0 text-[13px]">
+              {MONITORS.map((m) => (
+                <li key={m.kind} className="grid grid-cols-[96px_1fr] gap-2">
+                  <span className="font-medium">{KIND_LABEL[m.kind]}</span>
+                  <span className="text-c-soft">{m.rule}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+      </div>
+
+      <Interventions />
+
+      <ActivityLog only={selected} onClear={() => setSelected(null)} />
     </div>
   );
 }
 
-// ---------- court in session ----------
+const chipColor = (c: string) => ({ "--chip": c }) as React.CSSProperties;
+
+// ---------- alert ----------
 
 function InSession({ charge, trial }: { charge: Charge; trial?: Trial }) {
   return (
-    <section className="px-box flex flex-wrap items-center gap-4 p-4" style={{ borderColor: "var(--red)" }} aria-live="assertive">
-      <span className="px-inset p-1">
-        <Chibi who="worker" mood={charge.kind === "looping" ? "dizzy" : "worried"} scale={2} />
+    <section className="card flex flex-wrap items-center gap-4 p-4" style={{ borderColor: "var(--red)", borderLeftWidth: 4 }} aria-live="assertive">
+      <span className="chip pulse-soft" style={chipColor("var(--red)")}>
+        Court in session
       </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="px-tag pulse-step self-start" style={{ background: "var(--red)", color: "var(--on-accent)" }}>
-          Court is in session
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="font-medium">
+          {charge.workerId} is charged with {CHARGE_PHRASE[charge.kind]}. The worker is paused.
         </span>
-        <h2 className="text-[20px]">
-          {charge.workerId} is charged with {CHARGE_PHRASE[charge.kind]}
-        </h2>
-        <p className="m-0 line-clamp-2 text-sm text-soft">{charge.summary}</p>
+        <span className="line-clamp-1 text-[13px] text-c-soft">
+          {charge.summary}. Evidence: {charge.eventIds.map((n) => `event ${n}`).join(", ")}.
+        </span>
       </div>
       {trial && (
-        <Link href={`/court/${trial.id}`} className="px-btn red">
-          <PixelIcon name="gavel" />
-          Watch the trial
-        </Link>
+        <div className="flex gap-2">
+          <Link href={`/court/${trial.id}?view=record`} className="btn">Open the record</Link>
+          <Link href={`/court/${trial.id}`} className="btn danger">Watch the trial</Link>
+        </div>
       )}
     </section>
   );
 }
 
-function LatestCase({ trial }: { trial: Trial }) {
-  return (
-    <section className="px-box grid gap-6 p-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:p-6" aria-labelledby="latest-h">
-      <div className="self-start border-4 border-edge bg-[#2a1d4a]">
-        <CourtScene speaker="judge" moods={{ worker: trial.verdict.ruling === "halt" ? "worried" : "happy", pros: "angry", def: "neutral" }} swirl={false} workerLabel={trial.workerId} maxScale={4} />
-      </div>
-      <div className="flex flex-col justify-center gap-4">
-        <span className="text-sm text-soft">Latest intervention</span>
-        <h1 id="latest-h" className="text-[28px]">
-          {trial.workerId} was charged with {CHARGE_PHRASE[trial.charge.kind]}
-        </h1>
-        <p className="m-0 line-clamp-3">{trial.charge.summary}</p>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm">The court ruled</span>
-          <RulingTag ruling={trial.verdict.ruling} />
-        </div>
-        {trial.verdict.instruction && <p className="px-inset m-0 line-clamp-4 p-3 text-sm">{trial.verdict.instruction}</p>}
-        <div>
-          <Link href={`/court/${trial.id}`} className="px-btn red">
-            <PixelIcon name="gavel" />
-            Watch the trial
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
+// ---------- run controls ----------
 
-function QuietCourt() {
-  return (
-    <section className="px-box grid gap-6 p-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:p-6" aria-labelledby="quiet-h">
-      <div className="self-start border-4 border-edge bg-[#2a1d4a]">
-        <CourtScene speaker={null} moods={{ worker: "happy", judge: "happy" }} workerLabel="a worker" maxScale={4} />
-      </div>
-      <div className="flex flex-col justify-center gap-4">
-        <h1 id="quiet-h" className="text-[28px]">The court is waiting</h1>
-        <p className="m-0">
-          Cheap code monitors check every step each worker takes. Court only convenes when one of them flags a worker that is looping, stuck, overspending, or flailing.
-        </p>
-      </div>
-    </section>
-  );
-}
-
-// ---------- run status and replay controls ----------
-
-function RunBar() {
+function RunControls() {
   const live = useLive();
-  const workers = Object.values(live.workers);
-  const steps = workers.reduce((s, w) => s + w.events.length, 0);
-  const agentSpend = workers.reduce((s, w) => s + w.status.costUsd, 0);
-  const courtSpend = live.runTrials.reduce((s, t) => s + t.costUsd, 0);
-  const sourceLabel = { connecting: "Connecting to the engine...", live: "Live from the engine", replay: "Demo replay of a recorded run" }[live.source];
-
+  const label = {
+    connecting: "Connecting to the engine",
+    live: "Live from the engine",
+    disconnected: "Disconnected from the engine, showing the last data received",
+    replay: "Replaying a recorded run",
+  }[live.source];
   return (
-    <section className="px-box flex flex-wrap items-center gap-x-10 gap-y-4 px-6 py-4" aria-label="Run totals">
-      <Stat label="Workers watched" value={String(workers.length)} />
-      <Stat label="Steps checked by monitors" value={String(steps)} />
-      <Stat label="Agent spend" value={usd(agentSpend)} />
-      <Stat label={live.runTrials.some((t) => t.mock) ? "Court spend (mock)" : "Court spend"} value={usd(courtSpend)} />
-      <Stat label="Trials held" value={String(live.runTrials.length)} />
-      <div className="ml-auto flex flex-col items-end gap-2">
-        <span className="text-sm text-soft">
-          {sourceLabel}
-          {live.source === "replay" ? `, ${Math.round(live.progress * 100)}%` : ""}
-        </span>
-        {live.source === "replay" && (
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className="px-btn ghost" onClick={() => live.setPlaying(!live.playing)}>
-              {live.playing ? "Pause" : "Play"}
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-[13px]" style={{ color: live.source === "disconnected" ? "var(--amber)" : "var(--c-soft)" }}>
+        {label}
+        {live.source === "replay" ? ` (${Math.round(live.progress * 100)}%)` : ""}
+      </span>
+      {live.source === "replay" && (
+        <>
+          <button type="button" className="btn" onClick={() => live.setPlaying(!live.playing)}>
+            {live.playing ? "Pause" : "Play"}
+          </button>
+          {[1, 2, 4].map((s) => (
+            <button key={s} type="button" className="btn" aria-pressed={live.speed === s} onClick={() => live.setSpeed(s)}>
+              {s}x
             </button>
-            {[1, 2, 4].map((s) => (
-              <button key={s} type="button" className={`px-btn ${live.speed === s ? "" : "ghost"}`} aria-pressed={live.speed === s} onClick={() => live.setSpeed(s)}>
-                {s}x
-              </button>
-            ))}
-            <button type="button" className="px-btn ghost" onClick={live.restart}>
-              Restart
-            </button>
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col">
-      <span className="font-display text-[28px] leading-none">{value}</span>
-      <span className="text-sm text-soft">{label}</span>
+          ))}
+          <button type="button" className="btn" onClick={live.restart}>
+            Restart
+          </button>
+        </>
+      )}
     </div>
   );
 }
 
-// ---------- with vs. without the court ----------
+// ---------- headline numbers ----------
 
-function minutes(s?: number): string {
-  if (!s) return "";
-  return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+function countBy<T extends string>(items: T[]): [T, number][] {
+  const m = new Map<T, number>();
+  for (const i of items) m.set(i, (m.get(i) ?? 0) + 1);
+  return [...m.entries()];
 }
 
-function ComparisonPanel({ comparison }: { comparison?: Comparison }) {
-  if (!comparison) {
-    return (
-      <section className="px-box flex flex-col gap-2 p-6" aria-labelledby="cmp-h">
-        <h2 id="cmp-h" className="text-[20px]">With the court vs. without it</h2>
-        <p className="m-0 text-soft">The same task also runs once with the court turned off. The comparison appears here when both runs finish.</p>
-      </section>
-    );
-  }
-  const { withCourt: a, withoutCourt: b } = comparison;
-  const scale = Math.max(a.costUsd, b.costUsd, a.budgetUsd);
-  const saved = b.costUsd - a.costUsd;
+function Kpis() {
+  const live = useLive();
+  const workers = Object.values(live.workers);
+  const steps = workers.reduce((s, w) => s + w.events.length, 0);
+  const courtSpend = live.runTrials.reduce((s, t) => s + t.costUsd, 0);
+  const mock = live.runTrials.some((t) => t.mock);
+  const cmp = live.comparison;
+  const saved = cmp ? savings(cmp) : null;
+  const rulings = countBy<Ruling>(live.runTrials.map((t) => t.verdict.ruling));
+  const states = countBy<WorkerState>(workers.map((w) => w.status.state));
+
   return (
-    <section className="px-box flex flex-col gap-5 p-6" aria-labelledby="cmp-h">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <h2 id="cmp-h" className="text-[20px]">With the court vs. without it</h2>
-        <p className="m-0 font-display text-[20px]" style={{ color: "var(--gold)" }}>
-          {saved > 0 ? `The court saved ${usd(saved)} (${Math.round((saved / b.costUsd) * 100)}%)` : "Same cost either way"}
-          {a.state === "succeeded" && b.state !== "succeeded" ? " and the task finished" : ""}
-        </p>
-      </div>
-      <RunRow label="With the court" run={a} scale={scale} />
-      <RunRow label="Without the court" run={b} scale={scale} />
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Headline numbers">
+      <Kpi
+        value={saved ? usd(saved.usd) : cmp ? "Incomplete" : "–"}
+        label="Saved vs. running unsupervised"
+        detail={
+          saved && cmp
+            ? `${Math.round(saved.percent)}% less than the same task without the court, which ${cmp.withoutCourt.state === "succeeded" ? "also finished" : "never finished"}.`
+            : cmp
+              ? "Some court costs weren't reported, so the total is incomplete."
+              : "Appears when the unsupervised run of the same task finishes."
+        }
+        accent={saved ? "var(--green)" : undefined}
+      />
+      <Kpi
+        value={String(live.runTrials.length)}
+        label="Interventions"
+        detail={rulings.length ? rulings.map(([r, n]) => `${n} ${RULING_LABEL[r].toLowerCase()}`).join(" · ") : "No trials yet."}
+      />
+      <Kpi value={usd(courtSpend)} label="Cost of oversight" detail={`Monitors checked ${steps} steps with no model calls.${mock ? " The court ran in mock mode." : ""}`} />
+      <Kpi value={String(workers.length)} label="Workers" detail={states.map(([s, n]) => `${n} ${STATE_LABEL[s].toLowerCase()}`).join(" · ") || "None yet."} />
     </section>
   );
 }
 
-function RunRow({ label, run, scale }: { label: string; run: WorkerStatus; scale: number }) {
-  const ok = run.state === "succeeded";
-  const cells = 24;
-  const budgetCell = Math.round((run.budgetUsd / scale) * cells);
-  const filled = Math.round((run.costUsd / scale) * cells);
+function Kpi({ value, label, detail, accent }: { value: string; label: string; detail: string; accent?: string }) {
   return (
-    <div className="grid gap-2 md:grid-cols-[180px_minmax(0,1fr)_220px] md:items-center">
-      <span className="font-display">{label}</span>
-      <div className="flex flex-col gap-1">
-        <div className="flex gap-1" role="meter" aria-label={`${label}: spend`} aria-valuenow={run.costUsd} aria-valuemin={0} aria-valuemax={scale}>
-          {Array.from({ length: cells }, (_, i) => (
-            <span key={i} className="h-4 flex-1 border-2 border-edge" style={{ background: i < filled ? (i >= budgetCell ? "var(--red)" : "var(--amber)") : "var(--inset)" }} />
-          ))}
-        </div>
-        <span className="text-sm text-soft">
-          {usd(run.costUsd)} of a {usd(run.budgetUsd)} budget · {run.testsPassing}/{run.testsTotal} tests · {minutes(run.seconds)}
-        </span>
-      </div>
-      <span className="px-tag justify-self-start md:justify-self-end" style={{ background: ok ? "var(--green)" : "var(--red)", color: "var(--on-accent)" }}>
-        {ok ? "Finished" : run.summary?.startsWith("Ran out of budget") ? "Ran out of budget" : "Did not finish"}
+    <div className="card flex flex-col gap-1 p-4">
+      <span className="text-[13px] text-c-soft">{label}</span>
+      <span className="text-[30px] font-semibold leading-tight" style={{ color: accent }}>
+        {value}
       </span>
+      <span className="text-[13px] text-c-soft">{detail}</span>
     </div>
   );
 }
 
 // ---------- workers ----------
 
-function moodFor(w: LiveWorker): Mood {
-  const open = w.charges.at(-1);
-  switch (w.status.state) {
-    case "running":
-    case "succeeded":
-      return "happy";
-    case "on_trial":
-      return open?.kind === "looping" ? "dizzy" : "worried";
-    default:
-      return "worried";
-  }
-}
-
-function WorkerCard({ worker: w, selected, onSelect }: { worker: LiveWorker; selected: boolean; onSelect: () => void }) {
+function WorkerRow({ worker: w, selected, onSelect }: { worker: LiveWorker; selected: boolean; onSelect: () => void }) {
   const live = useLive();
   const s = w.status;
-  const last = w.events.at(-1);
   const lastCharge = w.charges.at(-1);
   const lastRuling = w.rulings.at(-1);
-  const trial = lastCharge ? live.trialFor(s.workerId, lastCharge.id ?? 0) : undefined;
   const open = live.openCharges.filter((c) => c.workerId === s.workerId).map((c) => c.kind);
-  const lights = s.state === "halted" && lastCharge ? [lastCharge.kind] : open;
-  const onTrial = s.state === "on_trial";
-
+  const lit = s.state === "halted" && lastCharge ? [lastCharge.kind] : open;
   return (
-    <article
-      className="px-box flex flex-col gap-4 p-4"
-      style={{ borderColor: onTrial ? "var(--red)" : undefined, outline: selected ? "4px solid var(--gold)" : undefined, outlineOffset: 4 }}
-    >
-      <button type="button" onClick={onSelect} aria-pressed={selected} className="flex cursor-pointer items-start gap-3 border-0 bg-transparent p-0 text-left text-text">
-        <span className="px-inset shrink-0 p-1">
-          <Chibi who="worker" mood={moodFor(w)} scale={2} />
+    <tr onClick={onSelect} className="cursor-pointer" style={{ background: selected ? "var(--c-raise)" : undefined }}>
+      <td>
+        <button type="button" className="cursor-pointer border-0 bg-transparent p-0 font-medium text-c-text" aria-pressed={selected}>
+          {s.workerId}
+        </button>
+      </td>
+      <td>
+        <StateChip state={s.state} />
+      </td>
+      <td>
+        <span className="flex items-center gap-3">
+          <Sparkline events={w.events} total={s.testsTotal} />
+          <span>
+            {s.testsPassing}/{s.testsTotal}
+          </span>
         </span>
-        <span className="flex min-w-0 flex-col gap-1">
-          <span className="font-display text-[20px] leading-none">{s.workerId}</span>
-          <span className="text-sm text-soft">Step {s.step}</span>
-          <StatusTag state={s.state} />
-        </span>
-      </button>
-
-      <div className="flex flex-col gap-1">
-        <div className="flex justify-between text-sm">
-          <span>Tests passing</span>
-          <span>{s.testsPassing} / {s.testsTotal}</span>
+      </td>
+      <td className="min-w-[140px]">
+        <div className="flex flex-col gap-1.5">
+          <span>
+            {usd(s.costUsd)} <span className="text-c-soft">of {usd(s.budgetUsd)}</span>
+          </span>
+          <Bar value={s.costUsd} max={s.budgetUsd} color="var(--amber)" warnAt={0.8} label={`${s.workerId} spend`} />
         </div>
-        <Meter value={s.testsPassing} max={s.testsTotal} color="var(--green)" label={`${s.workerId} tests passing`} />
+      </td>
+      <td>{s.step}</td>
+      <td>
+        <MonitorDots lit={lit} />
+      </td>
+      <td>{lastRuling ? <RulingChip ruling={lastRuling.verdict.ruling} /> : <span className="text-c-soft">None</span>}</td>
+    </tr>
+  );
+}
+
+// ---------- with vs. without ----------
+
+function duration(s?: number): string {
+  if (!s) return "";
+  return `${Math.floor(s / 60)}m ${String(Math.round(s % 60)).padStart(2, "0")}s`;
+}
+
+function ComparisonCard({ comparison, error }: { comparison?: ComparisonResult; error?: string }) {
+  if (!comparison) {
+    return (
+      <section className="card flex flex-col gap-2 p-4" aria-labelledby="cmp-h">
+        <h2 id="cmp-h" className="text-[15px]">With the court vs. without</h2>
+        <p className="m-0 text-[13px]" style={{ color: error ? "var(--amber)" : "var(--c-soft)" }}>
+          {error ? `The comparison run failed: ${error}` : "The same task also runs with the court turned off. Both results land here when the runs finish."}
+        </p>
+      </section>
+    );
+  }
+  const rows = [
+    { label: "With the court", run: comparison.withCourt },
+    { label: "Without the court", run: comparison.withoutCourt },
+  ];
+  const scale = Math.max(...rows.map((r) => runCosts(r.run).total ?? r.run.costUsd), comparison.withCourt.budgetUsd);
+  return (
+    <section className="card flex flex-col gap-4 p-4" aria-labelledby="cmp-h">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 id="cmp-h" className="text-[15px]">With the court vs. without</h2>
+        {comparison.costMode === "simulated" && <span className="chip">Simulated costs</span>}
       </div>
+      {rows.map(({ label, run }) => {
+        const ok = run.state === "succeeded";
+        const cost = runCosts(run);
+        return (
+          <div key={label} className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between gap-2 text-[13px]">
+              <span className="font-medium">{label}</span>
+              <span className="chip" style={chipColor(ok ? "var(--green)" : "var(--red)")}>
+                {ok ? "Finished" : run.summary?.startsWith("Ran out of budget") ? "Ran out of budget" : "Did not finish"}
+              </span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full" style={{ background: "var(--c-line)" }}>
+              <div className="h-full rounded-full" style={{ width: `${((cost.total ?? run.costUsd) / scale) * 100}%`, background: ok ? "var(--green)" : "var(--red)" }} />
+            </div>
+            <span className="text-[13px] text-c-soft">
+              {cost.total === null ? "Total incomplete" : usd(cost.total)}
+              {cost.court !== undefined ? ` (worker ${usd(cost.worker)} + court ${usd(cost.court)}${cost.courtComplete ? "" : " + unknown"})` : ""} · {run.testsPassing}/{run.testsTotal} tests · {duration(run.seconds)}
+            </span>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
 
-      <div className="flex flex-col gap-1">
-        <div className="flex justify-between text-sm">
-          <span>Spend</span>
-          <span>{usd(s.costUsd)} of {usd(s.budgetUsd)}</span>
-        </div>
-        <Meter value={s.costUsd} max={s.budgetUsd} cells={20} color={s.costUsd / s.budgetUsd > 0.8 ? "var(--red)" : "var(--amber)"} label={`${s.workerId} spend`} />
-      </div>
+// ---------- interventions ----------
 
-      <WarningLights lit={lights} />
-
-      {lastRuling && (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-soft">Court ruled</span>
-          <RulingTag ruling={lastRuling.verdict.ruling} />
-        </div>
+function Interventions() {
+  const live = useLive();
+  const pending = live.openCharges.map((c) => ({ charge: c, trial: live.trialFor(c.workerId, c.id ?? 0), ruled: false }));
+  const ruled = live.runTrials.map((t) => ({ charge: t.charge, trial: t as Trial | undefined, ruled: true }));
+  const rows = [...pending, ...ruled.toReversed()];
+  return (
+    <section className="card overflow-x-auto" aria-labelledby="int-h">
+      <h2 id="int-h" className="px-4 pt-4 text-[15px]">Interventions</h2>
+      {rows.length === 0 ? (
+        <p className="m-0 p-4 text-c-soft">No monitor has flagged a worker yet.</p>
+      ) : (
+        <table className="data mt-2">
+          <thead>
+            <tr>
+              <th>Worker</th>
+              <th>Charge</th>
+              <th>Evidence</th>
+              <th>Ruling</th>
+              <th>Instruction to the worker</th>
+              <th>Court cost</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ charge, trial, ruled }) => (
+              <tr key={`${charge.workerId}-${charge.id}`}>
+                <td className="font-medium">{charge.workerId}</td>
+                <td>{KIND_LABEL[charge.kind]}</td>
+                <td className="whitespace-nowrap text-c-soft">{charge.eventIds.length > 4 ? `${charge.eventIds.length} events` : charge.eventIds.map((n) => `#${n}`).join(", ")}</td>
+                <td>
+                  {ruled && trial ? (
+                    <span className="flex items-center gap-2">
+                      <RulingChip ruling={trial.verdict.ruling} />
+                      {trial.summary && <span className="text-[12px] text-c-soft">summary judgment</span>}
+                    </span>
+                  ) : (
+                    <span className="chip pulse-soft" style={chipColor("var(--red)")}>
+                      In session
+                    </span>
+                  )}
+                </td>
+                <td className="max-w-[360px]">
+                  <span className="line-clamp-2 text-c-soft">{ruled ? (trial?.verdict.instruction ?? "None: the worker carries on as before.") : "Waiting for the Judge"}</span>
+                </td>
+                <td className="whitespace-nowrap">{trial && ruled ? `${usd(trial.costUsd)}${trial.mock ? " (mock)" : ""}` : ""}</td>
+                <td>
+                  {trial && (
+                    <span className="flex justify-end gap-2">
+                      <Link href={`/court/${trial.id}?view=record`} className="btn">Record</Link>
+                      <Link href={`/court/${trial.id}`} className="btn">Replay</Link>
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
-
-      <p className="m-0 line-clamp-2 text-sm text-soft">{s.summary ?? (last ? `Last step: ${describeEvent(last)}` : "Starting up...")}</p>
-
-      {trial && (
-        <Link href={`/court/${trial.id}`} className={`px-btn ${onTrial ? "red" : "ghost"} mt-auto justify-center`}>
-          <PixelIcon name="gavel" />
-          Watch the trial
-        </Link>
-      )}
-    </article>
+    </section>
   );
 }
 
 // ---------- activity ----------
 
 const TONE_COLOR: Record<FeedItem["tone"], string> = {
-  event: "var(--green)",
+  event: "var(--c-line)",
   fail: "var(--red)",
   charge: "var(--red)",
   verdict: "var(--gold)",
-  done: "var(--gold)",
+  done: "var(--green)",
 };
 
-function ActivityFeed({ only, onClear }: { only: string | null; onClear: () => void }) {
+function ActivityLog({ only, onClear }: { only: string | null; onClear: () => void }) {
   const live = useLive();
-  const rows = live.feed.filter((r) => !only || r.workerId === only).slice(0, 60);
+  const rows = live.feed.filter((r) => !only || r.workerId === only).slice(0, 80);
   return (
-    <section aria-labelledby="feed-h" className="flex flex-col gap-4">
-      <div className="flex items-center gap-4">
-        <h2 id="feed-h" className="text-[20px]">Activity{only ? ` for ${only}` : ""}</h2>
+    <section className="card" aria-labelledby="log-h">
+      <div className="flex items-center gap-3 px-4 pt-4">
+        <h2 id="log-h" className="text-[15px]">Activity{only ? ` for ${only}` : ""}</h2>
         {only && (
-          <button type="button" className="px-btn ghost" onClick={onClear}>
+          <button type="button" className="btn" onClick={onClear}>
             Show all workers
           </button>
         )}
       </div>
-      <ol className="px-box m-0 flex max-h-[420px] list-none flex-col overflow-y-auto p-0">
-        {rows.length === 0 && <li className="px-4 py-3 text-sm text-soft">Nothing yet.</li>}
-        {rows.map((r, i) => {
+      <ol className="m-0 mt-2 flex max-h-[360px] list-none flex-col overflow-y-auto p-0 text-[13px]">
+        {rows.length === 0 && <li className="px-4 py-3 text-c-soft">Nothing yet.</li>}
+        {rows.map((r) => {
           const trial = r.charge ? live.trialFor(r.charge.workerId, r.charge.id) : undefined;
-          const strong = r.tone === "charge" || r.tone === "verdict";
           return (
-            <li key={r.seq} className="flex items-start gap-3 px-4 py-2" style={{ background: i % 2 ? "var(--inset)" : undefined }}>
-              <span aria-hidden className="mt-1.5 inline-block size-3 shrink-0 border-2 border-edge" style={{ background: TONE_COLOR[r.tone] }} />
-              <span className="w-20 shrink-0 text-sm text-soft">{clock(r.at)}</span>
-              <span className="w-20 shrink-0 text-sm">{r.workerId}</span>
+            <li key={r.seq} className="grid grid-cols-[10px_88px_72px_1fr] items-baseline gap-3 border-b px-4 py-1.5" style={{ borderColor: "var(--c-line)" }}>
+              <span aria-hidden className="size-2 rounded-[2px]" style={{ background: TONE_COLOR[r.tone] }} />
+              <span className="text-c-soft">{clock(r.at)}</span>
+              <span>{r.workerId}</span>
               {trial ? (
-                <Link href={`/court/${trial.id}`} className={`min-w-0 text-sm underline decoration-2 underline-offset-4 ${strong ? "font-display" : ""}`}>
+                <Link href={`/court/${trial.id}?view=record`} className="font-medium underline underline-offset-2">
                   {r.text}
                 </Link>
               ) : (
-                <span className="min-w-0 text-sm" style={{ color: r.tone === "fail" ? "#ff8a9a" : undefined }}>
-                  {r.text}
-                </span>
+                <span style={{ color: r.tone === "fail" ? "#ff8a9a" : r.tone === "done" ? "var(--green)" : undefined }}>{r.text}</span>
               )}
             </li>
           );

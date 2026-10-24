@@ -28,6 +28,9 @@
       ],
       "@court/*": [
         "../court/src/*"
+      ],
+      "@shared/*": [
+        "../shared/*"
       ]
     }
   },

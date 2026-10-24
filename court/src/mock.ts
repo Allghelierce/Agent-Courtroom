@@ -48,6 +48,16 @@ export function mockVerdict(p: EvidencePacket): Verdict {
       cited_events: charged.map((e) => e.id),
     };
   }
+  // Premature stall: the worker has barely tested since the stall began and hit no
+  // tool errors, so it is still reading and editing, not stuck.
+  const testRuns = charged.filter((e) => e.tool === "run_tests").length;
+  if (p.charge.kind === "stalling" && charged.length && testRuns <= 1 && !charged.some((e) => e.error)) {
+    return {
+      ruling: "continue",
+      reasoning: `Only ${testRuns} test run in the charged window; the worker is still reading and editing, so the stall is premature.`,
+      cited_events: charged.map((e) => e.id),
+    };
+  }
   if (p.spend.fractionOfBudget >= 0.9) {
     return { ruling: "halt", reasoning: `Spend is at ${Math.round(p.spend.fractionOfBudget * 100)}% of budget with no recent progress, so further work is not worth the cost.`, cited_events: cited };
   }

@@ -1,3 +1,4 @@
 node_modules/
 cases/
 evals/
+__pycache__/

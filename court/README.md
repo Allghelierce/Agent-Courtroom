@@ -36,6 +36,19 @@ The court picks a provider automatically: **Anthropic** if `ANTHROPIC_API_KEY` i
 
 **Cost:** prices come from `shared/model-prices.json` (USD per million tokens, shared with the engine). Each trial records `costUsd`, `costComplete` (false if a model had no listed price), and `pricingDate`. The engine fetches the trial with `GET /cases/<X-Case-Id>` and adds `costUsd` to `WorkerStatus.courtCostUsd`.
 
+## Summary judgment (no trial)
+
+When the court has the worker's earlier trials (the HTTP server always passes the case log), plain code can decide a charge before any model is called. These rulings cost $0, set `trial.summary`, and list the cases they rest on in `trial.priorCaseIds`.
+
+| Rule | When | Ruling |
+|---|---|---|
+| Repeat offender | Charged again within `COURT_REPEAT_WINDOW_MIN` (30) of a `change_strategy` ruling | `escalate`: the new strategy didn't work |
+| Repeat offender | Charged again after that escalation | `halt` |
+| Court budget | Court spend on this worker ≥ max(`COURT_BUDGET_FLOOR_USD` $0.05, `COURT_BUDGET_FRACTION` 5% × worker spend) | `escalate` |
+| Court budget | `COURT_MAX_TRIALS_PER_HOUR` (6) full trials for this worker in the last hour | `escalate` |
+
+A `continue` ruling or a quiet spell longer than the window resets the repeat chain. Worker IDs repeat across engine `run`/`compare` invocations, so only trials that finished after the current run began count: the engine can send `workerStartedAt` in the packet; otherwise the court uses the oldest event it was sent. `COURT_RULES=off` disables all of it.
+
 ## Run
 
 ```bash

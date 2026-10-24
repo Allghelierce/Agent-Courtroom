@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { mockArgument, mockVerdict } from "./mock.ts";
 import { findPrecedents, renderPrecedents } from "./precedent.ts";
+import { rulesConfig, summaryArgument, summaryJudgment, type RulesConfig } from "./rules.ts";
 import { DEFENSE_SYSTEM, JUDGE_SYSTEM, PROSECUTOR_SYSTEM, renderPacket } from "./prompts.ts";
 import type { Argument, EvidencePacket, Side, Trial, Verdict } from "./types.ts";
 
@@ -80,7 +81,9 @@ export type CourtOptions = {
   client?: Anthropic;
   groq?: Groq;
   onTrial?: (trial: Trial) => void | Promise<void>;
-  past?: Trial[]; // earlier trials; the most similar few are shown to the Judge as precedent
+  past?: Trial[]; // earlier trials: precedent for the Judge, and history for the summary-judgment rules
+  rules?: RulesConfig; // defaults to rulesConfig() from env
+  now?: number; // for tests
 };
 
 function useMock(opts: CourtOptions): boolean {
@@ -188,6 +191,31 @@ export async function convene(packet: EvidencePacket, opts: CourtOptions = {}): 
 export async function holdTrial(packet: EvidencePacket, opts: CourtOptions = {}): Promise<Trial> {
   const startedAt = new Date().toISOString();
   const mock = useMock(opts);
+
+  // Repeat offenders and an over-budget court skip the trial entirely: no model calls.
+  const summary = opts.past ? summaryJudgment(packet, opts.past, opts.rules ?? rulesConfig(), opts.now) : null;
+  if (summary) {
+    const trial: Trial = {
+      id: `case-${randomUUID().slice(0, 8)}`,
+      workerId: packet.workerId,
+      charge: packet.charge,
+      prosecution: summaryArgument("prosecution", summary.prosecution),
+      defense: summaryArgument("defense", summary.defense),
+      verdict: summary.verdict,
+      summary: summary.kind,
+      priorCaseIds: summary.priorCaseIds,
+      runSince: packet.runSince,
+      judgeModel: "none",
+      costUsd: 0,
+      costComplete: true,
+      pricingDate: PRICES.verifiedAt,
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      mock,
+    };
+    await opts.onTrial?.(trial);
+    return trial;
+  }
   const court = mock ? undefined : backend(opts);
   const evidence = renderPacket(packet);
   const validIds = new Set(packet.events.map((e) => e.id));
@@ -213,6 +241,7 @@ export async function holdTrial(packet: EvidencePacket, opts: CourtOptions = {})
     defense,
     verdict: judged.verdict,
     precedents: precedents.map((t) => t.id),
+    runSince: packet.runSince,
     judgeModel: judged.model,
     judgeUsage: judged.usage,
     costUsd: round(prosecution.costUsd + defense.costUsd + judged.costUsd),

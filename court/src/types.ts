@@ -81,6 +81,7 @@ export type Trial = {
   prosecution: Argument;
   defense: Argument;
   verdict: Verdict;
+  precedents?: string[]; // ids of earlier trials shown to the Judge
   judgeModel: string;
   costUsd: number; // total court spend for this trial
   startedAt: string;

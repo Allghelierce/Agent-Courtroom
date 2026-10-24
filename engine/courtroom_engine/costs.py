@@ -1,5 +1,7 @@
 """Usage estimates from the same versioned price table used by the court."""
 
+from __future__ import annotations
+
 import json
 import re
 from pathlib import Path
@@ -7,8 +9,23 @@ from pathlib import Path
 PRICES = json.loads((Path(__file__).resolve().parents[2] / "shared/model-prices.json").read_text())
 
 
+def _key(model: str) -> str:
+    return model if model in PRICES["models"] else re.sub(r"-\d{8}$", "", model)
+
+
+def model_provider(model: str) -> str | None:
+    """The brain ("claude" or "groq") that serves this model, or None if it isn't in the table."""
+    return PRICES["modelProviders"].get(_key(model))
+
+
+def pricing_info(model: str) -> dict:
+    """Where this model's rates came from and when they were checked."""
+    provider = PRICES["providers"].get(model_provider(model), {})
+    return {"source": provider.get("source"), "verifiedAt": provider.get("verifiedAt")}
+
+
 def model_rates(model: str, input_tokens: int = 0):
-    key = model if model in PRICES["models"] else re.sub(r"-\d{8}$", "", model)
+    key = _key(model)
     rates = PRICES["models"].get(key)
     if key == "claude-haiku-5-5" and input_tokens > PRICES["haikuLongContextThreshold"]:
         rates = PRICES["haikuLongContextRates"]

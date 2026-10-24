@@ -13,7 +13,8 @@ from .bus import Bus
 from .court import Court, build_packet
 from .schema import Charge, Event, Verdict, WorkerStatus
 from .tasks import Env, Task, ToolOutcome
-from .costs import PRICES
+from .costs import PRICES, pricing_info
+from .evidence import capture
 
 HUMAN_WAIT_SECONDS = 600
 
@@ -35,6 +36,8 @@ class Worker:
         enabled_monitors=monitors.MVP_MONITORS,
         seed: Optional[Path] = None,
         keep_env: bool = False,
+        evidence_dir: Optional[Path] = None,
+        human_wait_seconds: float = HUMAN_WAIT_SECONDS,
     ):
         self.id = worker_id
         self.task = task
@@ -46,6 +49,9 @@ class Worker:
         self.max_steps = max_steps
         self.enabled_monitors = enabled_monitors
         self.keep_env = keep_env
+        self.evidence_dir = evidence_dir
+        self.evidence_error = None
+        self.human_wait_seconds = human_wait_seconds
         self.events: list[Event] = []
         self.window_start = 0  # monitors only see events after the last ruling
         self.started = 0.0
@@ -93,7 +99,9 @@ class Worker:
                 "workerCostUsd": round(self.status.costUsd, 6),
                 "totalCostUsd": round(self.status.costUsd + self.status.courtCostUsd, 6) if self.status.courtCostComplete and self.status.workerCostComplete else None,
                 "caseIds": sorted(self.case_ids), "courtModes": sorted(self.court_modes),
-                "outcomeVerified": False}
+                "outcomeVerified": False,
+                "evidencePath": str(self.evidence_dir) if self.evidence_dir else None,
+                "evidenceError": self.evidence_error}
 
     def cancel(self) -> None:
         self._cancelled.set()
@@ -125,8 +133,16 @@ class Worker:
             self._finish("failed", f"Worker crashed: {type(e).__name__}: {e}")
         finally:
             self.stopped = time.monotonic()
-            if env is not None and not self.keep_env:
-                env.cleanup()
+            if env is not None:
+                try:
+                    if self.evidence_dir:
+                        capture(env, self.seed, self.evidence_dir, self.task.name)
+                except Exception as exc:
+                    self.evidence_error = f"{type(exc).__name__}: {exc}"
+                    self.bus.publish("evidence_error", {"workerId": self.id, "error": self.evidence_error})
+                finally:
+                    if not self.keep_env:
+                        env.cleanup()
         return self.status
 
     def _loop(self, env: Env) -> None:
@@ -143,7 +159,8 @@ class Worker:
             self.status.workerCostComplete &= action.cost_complete
             self.bus.publish("usage", {"workerId": self.id, "model": action.model, "usage": action.usage,
                                        "costUsd": action.cost_usd if action.cost_complete else None,
-                                       "mode": self.status.costMode, "pricingDate": PRICES["verifiedAt"]})
+                                       "mode": self.status.costMode,
+                                       "pricingDate": pricing_info(action.model)["verifiedAt"] or PRICES["verifiedAt"]})
 
             if action.tool is None:
                 self.status.testsPassing, self.status.testsTotal = env.baseline()
@@ -232,7 +249,7 @@ class Worker:
         self._set_state("awaiting_human")
         if self._cancelled.is_set():
             self._human_ready.set()
-        if self._human_ready.wait(HUMAN_WAIT_SECONDS) and self._human_verdict:
+        if self._human_ready.wait(self.human_wait_seconds) and self._human_verdict:
             verdict = self._human_verdict
         else:
             verdict = Verdict(ruling="halt", reasoning="No human responded to the escalation in time")

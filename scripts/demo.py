@@ -1,4 +1,7 @@
-"""Start the existing court, durable engine, and dashboard. Mock mode is the default."""
+"""Start the court, durable engine, and dashboard with scripted workers and the mock court.
+
+No API keys or model calls. For real models use `python -m courtroom_engine` or scripts/benchmark.py.
+"""
 
 from __future__ import annotations
 
@@ -58,6 +61,29 @@ def stop(process: subprocess.Popen):
             process.wait()
 
 
+class Services:
+    """Processes this script started, each logging to <logs>/<name>.log; close() stops them all."""
+
+    def __init__(self, logs: Path, env: dict):
+        self.logs, self.env = logs, env
+        self.processes: list[subprocess.Popen] = []
+        self.handles = []
+
+    def start(self, name: str, command: list[str], cwd: Path, env: dict | None = None) -> subprocess.Popen:
+        handle = (self.logs / f"{name}.log").open("w")
+        self.handles.append(handle)
+        process = subprocess.Popen(command, cwd=cwd, env=env or self.env, stdout=handle,
+                                   stderr=subprocess.STDOUT, start_new_session=True)
+        self.processes.append(process)
+        return process
+
+    def close(self):
+        for process in reversed(self.processes):
+            stop(process)
+        for handle in self.handles:
+            handle.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workers", type=int, choices=range(0, 6), default=3)
@@ -69,18 +95,10 @@ def main():
     node = node_binary()
     logs = ROOT / "runs/demo" / time.strftime("%Y%m%d-%H%M%S")
     logs.mkdir(parents=True, exist_ok=True)
-    processes = []
-    handles = []
     env = {**os.environ, "COURT_MOCK": "1", "COURT_PORT": "4100", "COURT_HOST": "127.0.0.1",
            "NEXT_PUBLIC_ENGINE_URL": "http://127.0.0.1:8787", "COURT_CASES_DIR": str(ROOT / "runs/demo/cases")}
-
-    def start(name, command, cwd):
-        handle = (logs / f"{name}.log").open("w")
-        handles.append(handle)
-        process = subprocess.Popen(command, cwd=cwd, env=env, stdout=handle, stderr=subprocess.STDOUT, start_new_session=True)
-        processes.append(process)
-        return process
-
+    services = Services(logs, env)
+    start = services.start
     try:
         court = start("court", [node, "--import", "tsx", "src/server.ts"], ROOT / "court")
         wait_for("http://127.0.0.1:4100/health", court)
@@ -97,16 +115,13 @@ def main():
         print(f"Scripted workers + mock court. Logs: {logs}\nCtrl-C stops only the processes this command started.", flush=True)
         started = time.monotonic()
         while args.duration is None or time.monotonic() - started < args.duration:
-            if any(p.poll() is not None for p in processes):
+            if any(p.poll() is not None for p in services.processes):
                 raise RuntimeError(f"A service exited unexpectedly; inspect {logs}")
             time.sleep(0.5)
     except KeyboardInterrupt:
         pass
     finally:
-        for process in reversed(processes):
-            stop(process)
-        for handle in handles:
-            handle.close()
+        services.close()
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ from .bus import Bus
 from .court import HttpCourt, StubCourt
 from .tasks import TASKS, Task
 from .worker import Worker
-from .costs import PRICES
+from .costs import PRICES, model_provider, pricing_info
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -32,6 +32,9 @@ class RunConfig:
     all_monitors: bool = False
     step_delay: float = 0.0  # scripted brain only
     seed: Optional[Path] = None  # defaults to the task's own seed
+    evidence_dir: Optional[Path] = None
+    human_wait_seconds: float = 600
+    success_criteria: str = "pending human definition; state is engine-reported test completion only"
 
     def validate(self) -> None:
         if not isinstance(self.task, str) or (self.model is not None and (not isinstance(self.model, str) or not self.model)):
@@ -39,6 +42,8 @@ class RunConfig:
         get_task(self.task)
         if not isinstance(self.brain, str) or self.brain not in DEFAULT_MODELS:
             raise ValueError("brain must be scripted, claude, or groq")
+        if self.model is not None and self.brain != "scripted" and model_provider(self.model) != self.brain:
+            raise ValueError(f"model {self.model} is not a priced {self.brain} model; see shared/model-prices.json")
         if isinstance(self.budget_usd, bool) or not isinstance(self.budget_usd, (int, float)) or not math.isfinite(self.budget_usd) or self.budget_usd <= 0:
             raise ValueError("budgetUsd must be a positive finite number")
         if type(self.max_steps) is not int or not 1 <= self.max_steps <= 10000:
@@ -47,6 +52,8 @@ class RunConfig:
             raise ValueError("stepDelay must be between 0 and 60 seconds")
         if type(self.all_monitors) is not bool:
             raise ValueError("allMonitors must be boolean")
+        if not isinstance(self.human_wait_seconds, (int, float)) or not math.isfinite(self.human_wait_seconds) or self.human_wait_seconds < 0:
+            raise ValueError("human_wait_seconds must be a nonnegative finite number")
         if not isinstance(self.court, str) or not (self.court in ("stub", "none") or self.court.startswith(("http://", "https://"))):
             raise ValueError("court must be stub, none, or an HTTP URL")
 
@@ -107,6 +114,8 @@ class Engine:
             budget_usd=cfg.budget_usd,
             max_steps=cfg.max_steps,
             enabled_monitors=tuple(monitors.ALL_MONITORS) if cfg.all_monitors else monitors.MVP_MONITORS,
+            evidence_dir=cfg.evidence_dir / worker_id if cfg.evidence_dir else None,
+            human_wait_seconds=cfg.human_wait_seconds,
         )
         with self._lock:
             self.workers[worker_id] = worker
@@ -159,20 +168,23 @@ class Engine:
         without_court = self.create_worker(cfg, court="none", label="no-court")
         for worker in (with_court, without_court):
             worker.run()
+        model = cfg.model or DEFAULT_MODELS[cfg.brain]
         result = {
             "id": f"comparison-{uuid.uuid4().hex}",
             "createdAt": datetime.now(timezone.utc).isoformat(),
             "task": cfg.task,
             "brain": cfg.brain,
-            "model": cfg.model or DEFAULT_MODELS[cfg.brain],
+            "model": model,
             "court": cfg.court,
             "budgetUsd": cfg.budget_usd,
             "maxSteps": cfg.max_steps,
             "costMode": "simulated" if cfg.brain == "scripted" else "estimated_from_usage",
+            # The court prices its own trials (Claude or Groq) from the same table.
             "pricingDate": PRICES["verifiedAt"],
-            "pricingSource": PRICES["source"],
-            "workerPricingSource": PRICES["groqSource"] if cfg.brain == "groq" else PRICES["source"],
-            "successCriteria": "pending human definition; state is engine-reported test completion only",
+            "pricingSources": {name: p["source"] for name, p in PRICES["providers"].items()},
+            "workerPricingDate": pricing_info(model)["verifiedAt"],
+            "workerPricingSource": pricing_info(model)["source"],
+            "successCriteria": cfg.success_criteria,
             "withCourt": with_court.result(),
             "withoutCourt": without_court.result(),
         }

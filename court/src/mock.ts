@@ -48,13 +48,23 @@ export function mockVerdict(p: EvidencePacket): Verdict {
       cited_events: charged.map((e) => e.id),
     };
   }
+  // Premature stall: the worker has barely tested since the stall began and hit no
+  // tool errors, so it is still reading and editing, not stuck.
+  const testRuns = charged.filter((e) => e.tool === "run_tests").length;
+  if (p.charge.kind === "stalling" && charged.length && testRuns <= 1 && !charged.some((e) => e.error)) {
+    return {
+      ruling: "continue",
+      reasoning: `Only ${testRuns} test run in the charged window; the worker is still reading and editing, so the stall is premature.`,
+      cited_events: charged.map((e) => e.id),
+    };
+  }
   if (p.spend.fractionOfBudget >= 0.9) {
     return { ruling: "halt", reasoning: `Spend is at ${Math.round(p.spend.fractionOfBudget * 100)}% of budget with no recent progress, so further work is not worth the cost.`, cited_events: cited };
   }
   if (p.charge.kind === "flailing" && p.stats.errorsInWindow >= 5) {
     return { ruling: "escalate", reasoning: `The worker hit ${p.stats.errorsInWindow} errors in its recent steps without a clear way forward, so a human should decide.`, cited_events: cited };
   }
-  const external = err && /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|network|unreachable/i.test(err);
+  const external = err && /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EHOSTUNREACH|connection refused|URLError|timed out|network|unreachable/i.test(err);
   const instruction = external
     ? "Stop editing the code for the failing test. The external API it calls is unreachable: mock that API in the test, mark the test for human review, and finish the rest of the suite."
     : "Stop repeating the last change. Re-read the failing test's assertion, try a different fix, and if it still fails after one attempt, skip the test and flag it for human review.";

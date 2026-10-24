@@ -6,9 +6,10 @@
   "main": "src/index.ts",
   "scripts": {
     "trial": "tsx src/cli.ts",
-    "test": "tsx --test test/*.test.ts",
+    "test": "tsx --test test/*.test.ts scripts/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "serve": "tsx src/server.ts"
+    "serve": "tsx src/server.ts",
+    "eval": "tsx scripts/eval.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

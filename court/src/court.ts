@@ -4,6 +4,7 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { mockArgument, mockVerdict } from "./mock.ts";
+import { findPrecedents, renderPrecedents } from "./precedent.ts";
 import { DEFENSE_SYSTEM, JUDGE_SYSTEM, PROSECUTOR_SYSTEM, renderPacket } from "./prompts.ts";
 import type { Argument, EvidencePacket, Side, Trial, Verdict } from "./types.ts";
 
@@ -42,6 +43,7 @@ export type CourtOptions = {
   mock?: boolean; // force mock mode; defaults to true when no API credentials are set
   client?: Anthropic;
   onTrial?: (trial: Trial) => void | Promise<void>;
+  past?: Trial[]; // earlier trials; the most similar few are shown to the Judge as precedent
 };
 
 function useMock(opts: CourtOptions): boolean {
@@ -69,8 +71,10 @@ export async function holdTrial(packet: EvidencePacket, opts: CourtOptions = {})
     ),
   );
 
+  const precedents = opts.past?.length ? findPrecedents(packet, opts.past) : [];
+
   const { verdict, costUsd: judgeCost } = client
-    ? await judge(client, evidence, prosecution, defense, validIds)
+    ? await judge(client, evidence, prosecution, defense, validIds, renderPrecedents(precedents))
     : { verdict: mockVerdict(packet), costUsd: 0 };
 
   const trial: Trial = {
@@ -80,6 +84,7 @@ export async function holdTrial(packet: EvidencePacket, opts: CourtOptions = {})
     prosecution,
     defense,
     verdict,
+    precedents: precedents.map((t) => t.id),
     judgeModel: mock ? "mock" : JUDGE_MODEL,
     costUsd: round(prosecution.costUsd + defense.costUsd + judgeCost),
     startedAt,
@@ -119,8 +124,10 @@ async function judge(
   prosecution: Argument,
   defense: Argument,
   validIds: Set<number>,
+  precedents = "",
 ): Promise<{ verdict: Verdict; costUsd: number }> {
-  const content = `EVIDENCE PACKET\n\n${evidence}\n\nPROSECUTION ARGUES:\n${prosecution.argument}\n\nDEFENSE ARGUES:\n${defense.argument}\n\nIssue your verdict.`;
+  const prior = precedents ? `\n\n${precedents}\n(Earlier rulings on similar charges. Follow them only where this case's evidence is truly alike.)` : "";
+  const content = `EVIDENCE PACKET\n\n${evidence}${prior}\n\nPROSECUTION ARGUES:\n${prosecution.argument}\n\nDEFENSE ARGUES:\n${defense.argument}\n\nIssue your verdict.`;
   try {
     const res = await client.beta.messages.parse({
       model: JUDGE_MODEL,

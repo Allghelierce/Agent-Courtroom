@@ -1,1 +1,9 @@
 .superpowers/
+__pycache__/
+*.py[cod]
+.venv/
+node_modules/
+/runs/
+.env
+.env.local
+.env.*.local

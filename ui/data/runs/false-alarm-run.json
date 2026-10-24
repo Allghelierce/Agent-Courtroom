@@ -1,0 +1,158 @@
+{
+  "budgetUsd": 1.0,
+  "events": [
+    {
+      "id": 1,
+      "workerId": "worker-05",
+      "step": 1,
+      "tool": "run_tests",
+      "args": {},
+      "tokens": 3400,
+      "costUsd": 0.0102,
+      "testsPassing": 2,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:20:00Z",
+      "result": "2/12 passing; failing: test_auth_bad_token, test_auth_required, test_create_validation, test_delete_cascade, test_delete_missing, test_list_default_limit, test_list_pagination, test_patch_todo, test_session_expiry, test_update_timestamps"
+    },
+    {
+      "id": 2,
+      "workerId": "worker-05",
+      "step": 2,
+      "tool": "read_file",
+      "args": {
+        "path": "src/router.ts"
+      },
+      "tokens": 3900,
+      "costUsd": 0.0117,
+      "testsPassing": 2,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:20:20Z",
+      "result": "read 58 lines"
+    },
+    {
+      "id": 3,
+      "workerId": "worker-05",
+      "step": 3,
+      "tool": "read_file",
+      "args": {
+        "path": "src/auth.ts"
+      },
+      "tokens": 4400,
+      "costUsd": 0.0132,
+      "testsPassing": 2,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:20:40Z",
+      "result": "read 41 lines"
+    },
+    {
+      "id": 4,
+      "workerId": "worker-05",
+      "step": 4,
+      "tool": "read_file",
+      "args": {
+        "path": "src/db.ts"
+      },
+      "tokens": 4900,
+      "costUsd": 0.0147,
+      "testsPassing": 2,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:21:00Z",
+      "result": "read 77 lines"
+    },
+    {
+      "id": 5,
+      "workerId": "worker-05",
+      "step": 5,
+      "tool": "read_file",
+      "args": {
+        "path": "src/session.ts"
+      },
+      "tokens": 5300,
+      "costUsd": 0.0159,
+      "testsPassing": 2,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:21:20Z",
+      "result": "read 29 lines"
+    },
+    {
+      "id": 6,
+      "workerId": "worker-05",
+      "step": 6,
+      "tool": "edit_file",
+      "args": {
+        "path": "src/router.ts",
+        "old_str": "router.put(\"/todos/:id\", updateTodo);\n",
+        "new_str": "router.put(\"/todos/:id\", updateTodo);\nrouter.patch(\"/todos/:id\", patchTodo);\n"
+      },
+      "tokens": 5800,
+      "costUsd": 0.0174,
+      "testsPassing": 2,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:21:40Z",
+      "result": "edited src/router.ts"
+    },
+    {
+      "id": 7,
+      "workerId": "worker-05",
+      "step": 7,
+      "tool": "edit_file",
+      "args": {
+        "path": "src/auth.ts",
+        "old_str": "if (!header) return next();\n",
+        "new_str": "if (!header?.startsWith(\"Bearer \")) return res.status(401).end();\n"
+      },
+      "tokens": 6200,
+      "costUsd": 0.0186,
+      "testsPassing": 2,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:22:00Z",
+      "result": "edited src/auth.ts"
+    },
+    {
+      "id": 8,
+      "workerId": "worker-05",
+      "step": 8,
+      "tool": "edit_file",
+      "args": {
+        "path": "src/db.ts",
+        "old_str": "SELECT * FROM todos ORDER BY id",
+        "new_str": "SELECT * FROM todos ORDER BY id LIMIT $1 OFFSET $2"
+      },
+      "tokens": 6600,
+      "costUsd": 0.0198,
+      "testsPassing": 2,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:22:20Z",
+      "result": "edited src/db.ts"
+    }
+  ],
+  "charge": {
+    "id": 1,
+    "workerId": "worker-05",
+    "kind": "stalling",
+    "summary": "Passing tests stuck at 2/12 for 8 steps",
+    "eventIds": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ]
+  },
+  "verdict": {
+    "ruling": "continue",
+    "reasoning": "No tests have run since event 1, so a flat count says nothing about progress. Events 2-5 each read a different file once, and events 6-8 edit exactly the code behind the failures in event 1 (PATCH route, bearer-token auth, pagination). This is a read-then-fix pass, not a stall.",
+    "cited_events": [
+      1,
+      2,
+      5,
+      6,
+      7,
+      8
+    ],
+    "expected": "continue: the stalling check fired before the worker reran the tests. The Judge should see that the edits target the failures and let it run."
+  }
+}

@@ -1,0 +1,163 @@
+@import "tailwindcss";
+
+/* Tokens and shared pixel classes. The rules behind them are in ART.md. */
+:root {
+  /* The palette from the original anime-pixel mockup. */
+  --bg: #0b0814;
+  --bg-check: #0e0a1a;
+  --panel: #1b1430;
+  --inset: #120c22;
+  --edge: #3b2f57;
+  --shadow: #000000;
+  --text: #f6eedd;
+  --soft: #b9aed0;
+  --on-accent: #120c22;
+  --gold: #f7c948;
+  --red: #ff5d73;
+  --blue: #5cc8ff;
+  --green: #7af0c4;
+  --amber: #ffb347;
+  --px: 4px;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-inset: var(--inset);
+  --color-edge: var(--edge);
+  --color-text: var(--text);
+  --color-soft: var(--soft);
+  --color-gold: var(--gold);
+  --color-red: var(--red);
+  --color-blue: var(--blue);
+  --color-green: var(--green);
+  --color-amber: var(--amber);
+  --font-display: var(--font-pixelify);
+  --font-body: var(--font-dotgothic);
+}
+
+* { box-sizing: border-box; }
+
+html { color-scheme: dark; }
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-dotgothic), sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(45deg, var(--bg-check) 25%, transparent 25%, transparent 75%, var(--bg-check) 75%),
+    linear-gradient(45deg, var(--bg-check) 25%, transparent 25%, transparent 75%, var(--bg-check) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+  -webkit-font-smoothing: none;
+}
+
+h1, h2, h3, .font-display { font-family: var(--font-pixelify), sans-serif; font-weight: 700; margin: 0; line-height: 1.2; }
+
+a { color: inherit; }
+
+:focus-visible { outline: var(--px) solid var(--gold); outline-offset: var(--px); }
+
+canvas.pixelated { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+
+/* The standard panel. */
+.px-box {
+  position: relative;
+  background: var(--panel);
+  border: var(--px) solid var(--edge);
+  box-shadow: var(--px) var(--px) 0 0 var(--shadow);
+}
+
+.px-inset {
+  background: var(--inset);
+  border: var(--px) solid var(--edge);
+}
+
+.px-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-pixelify), sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1;
+  padding: 12px 16px;
+  color: var(--on-accent);
+  background: var(--gold);
+  border: var(--px) solid var(--shadow);
+  box-shadow: 0 var(--px) 0 0 #7a5a14;
+  cursor: pointer;
+  text-decoration: none;
+  transform: translateY(0);
+}
+.px-btn:hover { filter: brightness(1.05); }
+.px-btn:active, .px-btn[aria-pressed="true"] { transform: translateY(var(--px)); box-shadow: 0 0 0 0 #7a5a14; }
+.px-btn.ghost { background: var(--inset); color: var(--text); border-color: var(--edge); box-shadow: 0 var(--px) 0 0 var(--shadow); }
+.px-btn.red { background: var(--red); box-shadow: 0 var(--px) 0 0 #5a1426; }
+
+.px-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-pixelify), sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+  padding: 6px 8px;
+  border: var(--px) solid var(--shadow);
+  white-space: nowrap;
+}
+
+/* Bursts (OBJECTION!, HOLD IT!) and the verdict stamp. Stepped, never eased. */
+.burst {
+  position: absolute;
+  left: 50%;
+  top: 32%;
+  font-family: var(--font-pixelify), sans-serif;
+  font-weight: 700;
+  font-size: clamp(28px, 6vw, 64px);
+  line-height: 1;
+  padding: 0.6em 1.1em;
+  color: #ffffff;
+  text-shadow: var(--px) var(--px) 0 #000000;
+  pointer-events: none;
+  transform: translate(-50%, -50%) rotate(-6deg) scale(0);
+  clip-path: polygon(0% 18%, 12% 0%, 22% 14%, 36% 2%, 46% 16%, 60% 0%, 70% 15%, 84% 1%, 90% 20%, 100% 30%, 92% 48%, 100% 66%, 88% 78%, 94% 100%, 76% 88%, 62% 100%, 50% 86%, 36% 100%, 26% 86%, 10% 98%, 12% 78%, 0% 70%, 8% 50%, 0% 34%);
+}
+.burst.show { animation: burst-in 0.24s steps(4) forwards; }
+.burst.red { background: var(--red); }
+.burst.blue { background: #2f8fe0; }
+@keyframes burst-in {
+  from { transform: translate(-50%, -50%) rotate(-6deg) scale(0); }
+  to { transform: translate(-50%, -50%) rotate(-6deg) scale(1); }
+}
+
+.stamp { animation: stamp-in 0.32s steps(4) forwards; }
+@keyframes stamp-in {
+  from { transform: rotate(-8deg) scale(2.2); opacity: 0; }
+  to { transform: rotate(-4deg) scale(1); opacity: 1; }
+}
+
+.shake { animation: shake 0.3s steps(6); }
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(calc(-1 * var(--px)), var(--px)); }
+  40% { transform: translate(var(--px), calc(-1 * var(--px))); }
+  60% { transform: translate(calc(-1 * var(--px)), 0); }
+  80% { transform: translate(var(--px), var(--px)); }
+}
+
+.blink { animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+.pulse-step { animation: pulse-step 1.2s steps(2) infinite; }
+@keyframes pulse-step { 50% { filter: brightness(1.15); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .burst.show { animation: none; transform: translate(-50%, -50%) rotate(-6deg) scale(1); }
+  .stamp { animation: none; transform: rotate(-4deg); opacity: 1; }
+  .shake, .blink, .pulse-step { animation: none; }
+}

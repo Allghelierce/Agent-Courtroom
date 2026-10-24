@@ -1,0 +1,8 @@
+[
+  {"id": "kettle", "name": "Steel Electric Kettle 1.7L", "url": "https://shop-a.example/products/kettle"},
+  {"id": "headphones", "name": "NoiseAway Wireless Headphones", "url": "https://shop-a.example/products/headphones"},
+  {"id": "blender", "name": "Vortex Pro Blender", "url": "https://shop-b.example/item/4471"},
+  {"id": "tv", "name": "Lumen 55\" 4K TV", "url": "https://shop-b.example/item/9023"},
+  {"id": "lamp", "name": "Arc Desk Lamp", "url": "https://shop-a.example/products/desk-lamp"},
+  {"id": "grinder", "name": "Precision Burr Coffee Grinder", "url": "https://shop-c.example/p/burr-grinder"}
+]

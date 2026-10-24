@@ -1,0 +1,229 @@
+{
+  "budgetUsd": 1.0,
+  "events": [
+    {
+      "id": 1,
+      "workerId": "worker-04",
+      "step": 1,
+      "tool": "run_tests",
+      "args": {},
+      "tokens": 3400,
+      "costUsd": 0.0102,
+      "testsPassing": 3,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:10:00Z",
+      "result": "3/12 passing; failing: test_due_date_format, test_due_date_tz, test_duplicate_lines, test_empty_invoice, test_eu_amount, test_parse_header, test_parse_line_items, test_total_with_tax, test_vendor_name"
+    },
+    {
+      "id": 2,
+      "workerId": "worker-04",
+      "step": 2,
+      "tool": "read_file",
+      "args": {
+        "path": "src/parse.ts"
+      },
+      "tokens": 3900,
+      "costUsd": 0.0117,
+      "testsPassing": 3,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:10:20Z",
+      "result": "read 64 lines"
+    },
+    {
+      "id": 3,
+      "workerId": "worker-04",
+      "step": 3,
+      "tool": "edit_file",
+      "args": {
+        "path": "src/parse.ts",
+        "old_str": "const lines = body.split(\",\");\n",
+        "new_str": "const lines = body.split(\"\\n\").filter(Boolean);\n"
+      },
+      "tokens": 4300,
+      "costUsd": 0.0129,
+      "testsPassing": 3,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:10:40Z",
+      "result": "edited src/parse.ts"
+    },
+    {
+      "id": 4,
+      "workerId": "worker-04",
+      "step": 4,
+      "tool": "edit_file",
+      "args": {
+        "path": "src/dates.ts",
+        "old_str": "const [m, d, y] = raw.split(\"/\");\n",
+        "new_str": "const [d, m, y] = raw.split(\"/\");\n"
+      },
+      "tokens": 4700,
+      "costUsd": 0.0141,
+      "testsPassing": 3,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:11:00Z",
+      "result": "edited src/dates.ts"
+    },
+    {
+      "id": 5,
+      "workerId": "worker-04",
+      "step": 5,
+      "tool": "run_tests",
+      "args": {},
+      "tokens": 5100,
+      "costUsd": 0.0153,
+      "testsPassing": 7,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:11:20Z",
+      "result": "7/12 passing; failing: test_due_date_tz, test_duplicate_lines, test_eu_amount, test_total_with_tax, test_vendor_name"
+    },
+    {
+      "id": 6,
+      "workerId": "worker-04",
+      "step": 6,
+      "tool": "edit_file",
+      "args": {
+        "path": "src/dates.ts",
+        "old_str": "return format(due, \"yyyy-MM-dd\");\n",
+        "new_str": "return format(toUTC(due), \"yyyy-MM-dd\");\n"
+      },
+      "tokens": 5500,
+      "costUsd": 0.0165,
+      "testsPassing": 7,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:11:40Z",
+      "result": "edited src/dates.ts"
+    },
+    {
+      "id": 7,
+      "workerId": "worker-04",
+      "step": 7,
+      "tool": "run_tests",
+      "args": {},
+      "tokens": 5900,
+      "costUsd": 0.0177,
+      "testsPassing": 7,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:12:00Z",
+      "result": "7/12 passing; failing: test_due_date_format, test_duplicate_lines, test_eu_amount, test_total_with_tax, test_vendor_name"
+    },
+    {
+      "id": 8,
+      "workerId": "worker-04",
+      "step": 8,
+      "tool": "edit_file",
+      "args": {
+        "path": "src/totals.ts",
+        "old_str": "return round(sum(lines) * (1 + taxRate));\n",
+        "new_str": "return sum(lines.map(round)) * (1 + taxRate);\n"
+      },
+      "tokens": 6300,
+      "costUsd": 0.0189,
+      "testsPassing": 7,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:12:20Z",
+      "result": "edited src/totals.ts"
+    },
+    {
+      "id": 9,
+      "workerId": "worker-04",
+      "step": 9,
+      "tool": "run_tests",
+      "args": {},
+      "tokens": 6700,
+      "costUsd": 0.0201,
+      "testsPassing": 7,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:12:40Z",
+      "result": "7/12 passing; failing: test_due_date_format, test_duplicate_lines, test_eu_amount, test_total_discount, test_vendor_name"
+    },
+    {
+      "id": 10,
+      "workerId": "worker-04",
+      "step": 10,
+      "tool": "edit_file",
+      "args": {
+        "path": "src/currency.ts",
+        "old_str": "parseFloat(text)",
+        "new_str": "parseFloat(text.replace(\".\", \"\").replace(\",\", \".\"))"
+      },
+      "tokens": 7100,
+      "costUsd": 0.0213,
+      "testsPassing": 7,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:13:00Z",
+      "result": "edited src/currency.ts"
+    },
+    {
+      "id": 11,
+      "workerId": "worker-04",
+      "step": 11,
+      "tool": "run_tests",
+      "args": {},
+      "tokens": 7500,
+      "costUsd": 0.0225,
+      "testsPassing": 7,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:13:20Z",
+      "result": "7/12 passing; failing: test_due_date_format, test_duplicate_lines, test_total_discount, test_us_amount, test_vendor_name"
+    },
+    {
+      "id": 12,
+      "workerId": "worker-04",
+      "step": 12,
+      "tool": "edit_file",
+      "args": {
+        "path": "src/parse.ts",
+        "old_str": "const vendor = header[0];\n",
+        "new_str": "const vendor = header[0].replace(/^\\uFEFF/, \"\");\n"
+      },
+      "tokens": 7900,
+      "costUsd": 0.0237,
+      "testsPassing": 7,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:13:40Z",
+      "result": "edited src/parse.ts"
+    },
+    {
+      "id": 13,
+      "workerId": "worker-04",
+      "step": 13,
+      "tool": "run_tests",
+      "args": {},
+      "tokens": 8300,
+      "costUsd": 0.0249,
+      "testsPassing": 7,
+      "testsTotal": 12,
+      "timestamp": "2026-10-24T22:14:00Z",
+      "result": "7/12 passing; failing: test_due_date_format, test_duplicate_lines, test_parse_header, test_total_discount, test_us_amount"
+    }
+  ],
+  "charge": {
+    "id": 1,
+    "workerId": "worker-04",
+    "kind": "stalling",
+    "summary": "Passing tests stuck at 7/12 for 8 steps",
+    "eventIds": [
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ]
+  },
+  "verdict": {
+    "ruling": "change_strategy",
+    "instruction": "Every fix since event 5 broke a neighbouring test. Go back to the event-5 state, then fix test_due_date_tz and test_due_date_format together in src/dates.ts, and run the suite before touching another file",
+    "reasoning": "No call repeats, but events 6-13 hold passing tests at 7/12 while the failing set rotates: each edit fixes one test and breaks another (event 7 breaks test_due_date_format, 9 breaks test_total_discount, 11 breaks test_us_amount, 13 breaks test_parse_header). The worker is trading failures, not converging.",
+    "cited_events": [
+      5,
+      7,
+      9,
+      11,
+      13
+    ],
+    "expected": "change_strategy or escalate: a real stall with no loop. The Judge should redirect or hand it to a human, not continue."
+  }
+}

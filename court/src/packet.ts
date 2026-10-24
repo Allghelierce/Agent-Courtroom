@@ -1,13 +1,29 @@
-import type { Charge, Event, EvidencePacket } from "./types.ts";
+import type { Charge, EnginePacket, Event, EvidencePacket } from "./types.ts";
 
 export type PacketOptions = {
   budgetUsd: number;
   window?: number; // how many recent events the court sees (default 15)
+  task?: string;
+  spentUsd?: number; // total spend, when the events given are only a window
+  progress?: EvidencePacket["progress"]; // full test history, same reason
 };
 
-// Stable key for "the same call": tool plus args with sorted keys.
+// The engine sends only the last N events, so take spend and progress from its packet.
+export function fromEnginePacket(p: EnginePacket, opts: { window?: number } = {}): EvidencePacket {
+  return buildPacket(p.charge, p.events, {
+    budgetUsd: p.spend.budgetUsd,
+    spentUsd: p.spend.costUsd,
+    progress: p.testProgress,
+    task: p.task,
+    window: opts.window ?? Math.max(15, p.events.length),
+  });
+}
+
+// Stable key for "the same call": tool, args with sorted keys, and the outcome.
+// Matches the engine's looping monitor: rerunning tests is normal, rerunning them
+// and getting the same failure is not.
 export function callKey(e: Event): string {
-  return `${e.tool}:${stableStringify(e.args)}`;
+  return `${e.tool}:${stableStringify(e.args)}:${e.result ?? ""}:${e.error ?? ""}`;
 }
 
 function stableStringify(v: unknown): string {
@@ -29,7 +45,7 @@ export function buildPacket(charge: Charge, allEvents: Event[], opts: PacketOpti
   const extra = mine.filter((e) => charge.eventIds.includes(e.id) && !ids.has(e.id));
   const events = [...extra, ...recent].sort((a, b) => a.step - b.step);
 
-  const usd = mine.reduce((s, e) => s + e.costUsd, 0);
+  const usd = opts.spentUsd ?? mine.reduce((s, e) => s + e.costUsd, 0);
 
   const groups = new Map<string, Event[]>();
   for (const e of recent) {
@@ -44,27 +60,30 @@ export function buildPacket(charge: Charge, allEvents: Event[], opts: PacketOpti
 
   const errors = recent.filter((e) => e.error).map((e) => e.error as string);
 
+  const progress = opts.progress ?? mine.map((e) => ({ step: e.step, testsPassing: e.testsPassing, testsTotal: e.testsTotal }));
   let best = -1;
   let bestStep = 0;
-  for (const e of mine) {
+  for (const e of progress) {
     if (e.testsPassing > best) {
       best = e.testsPassing;
       bestStep = e.step;
     }
   }
-  const lastStep = mine.at(-1)?.step ?? 0;
+  const lastStep = Math.max(mine.at(-1)?.step ?? 0, progress.at(-1)?.step ?? 0);
 
   return {
     charge,
     workerId: charge.workerId,
+    task: opts.task,
     events,
-    progress: mine.map((e) => ({ step: e.step, testsPassing: e.testsPassing, testsTotal: e.testsTotal })),
+    progress,
     spend: { usd: round(usd), budgetUsd: opts.budgetUsd, fractionOfBudget: round(usd / opts.budgetUsd) },
     stats: {
-      totalSteps: mine.length,
+      totalSteps: lastStep,
       errorsInWindow: errors.length,
       distinctErrors: [...new Set(errors)],
-      lastError: errors.at(-1) ?? null,
+      // The engine reports failing tests in run_tests' result rather than in error.
+      lastError: errors.at(-1) ?? recent.filter((e) => e.tool === "run_tests" && e.result && /fail|error/i.test(e.result)).at(-1)?.result ?? null,
       repeatedCalls,
       stepsSinceProgress: lastStep - bestStep,
     },

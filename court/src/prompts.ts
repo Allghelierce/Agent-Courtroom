@@ -4,6 +4,7 @@ import type { EvidencePacket } from "./types.ts";
 // never the worker's own reasoning.
 export function renderPacket(p: EvidencePacket): string {
   const lines: string[] = [];
+  if (p.task) lines.push(`WORKER'S TASK: ${truncate(p.task, 300)}`);
   lines.push(`CHARGE: ${p.charge.kind.toUpperCase()} against ${p.workerId}`);
   lines.push(`Monitor summary: ${p.charge.summary}`);
   lines.push(`Charged events: ${p.charge.eventIds.map((id) => `#${id}`).join(", ")}`);
@@ -16,7 +17,7 @@ export function renderPacket(p: EvidencePacket): string {
   }
   lines.push(`Steps run: ${p.stats.totalSteps}. Steps since tests last improved: ${p.stats.stepsSinceProgress}.`);
   lines.push(`Errors in window: ${p.stats.errorsInWindow}${p.stats.distinctErrors.length ? ` (distinct: ${p.stats.distinctErrors.join(" | ")})` : ""}`);
-  if (p.stats.lastError) lines.push(`Most recent error: ${truncate(p.stats.lastError, 200)}`);
+  if (p.stats.lastError) lines.push(`Most recent error or test failure: ${truncate(p.stats.lastError, 200)}`);
   for (const r of p.stats.repeatedCalls.slice(0, 5)) {
     lines.push(`Repeated call x${r.count}: ${r.tool} ${truncate(r.args, 120)} (events ${r.eventIds.map((i) => `#${i}`).join(", ")})`);
   }
@@ -24,7 +25,8 @@ export function renderPacket(p: EvidencePacket): string {
   lines.push("EVENT LOG (oldest first):");
   for (const e of p.events) {
     const err = e.error ? ` ERROR: ${truncate(e.error, 160)}` : "";
-    lines.push(`#${e.id} step ${e.step} ${e.tool} ${truncate(JSON.stringify(e.args), 140)} | tests ${e.testsPassing}/${e.testsTotal} | $${e.costUsd.toFixed(4)}${err}`);
+    const out = e.result ? ` -> ${truncate(e.result, 120)}` : "";
+    lines.push(`#${e.id} step ${e.step} ${e.tool} ${truncate(JSON.stringify(e.args), 140)}${out} | tests ${e.testsPassing}/${e.testsTotal} | $${e.costUsd.toFixed(4)}${err}`);
   }
   return lines.join("\n");
 }

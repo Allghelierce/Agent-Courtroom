@@ -1,0 +1,393 @@
+{
+  "packet": {
+    "charge": {
+      "id": 1,
+      "workerId": "worker-1",
+      "kind": "looping",
+      "summary": "fetch_page({\"url\": \"https://shop-c.example/p/burr-grinder\"}) repeated 3 times in the last 10 steps with the same result: HTTP 503 from shop-c.example: Service temporarily unavailable. Please retry later. (Retry-After: 30)",
+      "eventIds": [
+        14,
+        15,
+        18
+      ]
+    },
+    "events": [
+      {
+        "id": 1,
+        "workerId": "worker-1",
+        "step": 1,
+        "tool": "list_products",
+        "args": {},
+        "tokens": 4450,
+        "costUsd": 0.0234,
+        "testsPassing": 0,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:26.941+00:00",
+        "result": "6 products"
+      },
+      {
+        "id": 2,
+        "workerId": "worker-1",
+        "step": 2,
+        "tool": "fetch_page",
+        "args": {
+          "url": "https://shop-a.example/products/kettle"
+        },
+        "tokens": 5550,
+        "costUsd": 0.0278,
+        "testsPassing": 0,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:27.299+00:00",
+        "result": "HTTP 200, 275 bytes"
+      },
+      {
+        "id": 3,
+        "workerId": "worker-1",
+        "step": 3,
+        "tool": "save_price",
+        "args": {
+          "product_id": "kettle",
+          "price": 34.99
+        },
+        "tokens": 6650,
+        "costUsd": 0.0322,
+        "testsPassing": 1,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:27.602+00:00",
+        "result": "saved kettle = $34.99"
+      },
+      {
+        "id": 4,
+        "workerId": "worker-1",
+        "step": 4,
+        "tool": "fetch_page",
+        "args": {
+          "url": "https://shop-a.example/products/headphones"
+        },
+        "tokens": 7750,
+        "costUsd": 0.0366,
+        "testsPassing": 1,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:27.909+00:00",
+        "result": "HTTP 200, 456 bytes"
+      },
+      {
+        "id": 5,
+        "workerId": "worker-1",
+        "step": 5,
+        "tool": "save_price",
+        "args": {
+          "product_id": "headphones",
+          "price": 129.0
+        },
+        "tokens": 8850,
+        "costUsd": 0.041,
+        "testsPassing": 1,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:28.215+00:00",
+        "result": "saved headphones = $129.00"
+      },
+      {
+        "id": 6,
+        "workerId": "worker-1",
+        "step": 6,
+        "tool": "fetch_page",
+        "args": {
+          "url": "https://shop-b.example/item/4471"
+        },
+        "tokens": 9950,
+        "costUsd": 0.0454,
+        "testsPassing": 1,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:28.521+00:00",
+        "result": "HTTP 200, 354 bytes"
+      },
+      {
+        "id": 7,
+        "workerId": "worker-1",
+        "step": 7,
+        "tool": "save_price",
+        "args": {
+          "product_id": "blender",
+          "price": 59.5
+        },
+        "tokens": 11050,
+        "costUsd": 0.0498,
+        "testsPassing": 2,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:28.827+00:00",
+        "result": "saved blender = $59.50"
+      },
+      {
+        "id": 8,
+        "workerId": "worker-1",
+        "step": 8,
+        "tool": "fetch_page",
+        "args": {
+          "url": "https://shop-b.example/item/9023"
+        },
+        "tokens": 12150,
+        "costUsd": 0.0542,
+        "testsPassing": 2,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:29.132+00:00",
+        "result": "HTTP 200, 341 bytes"
+      },
+      {
+        "id": 9,
+        "workerId": "worker-1",
+        "step": 9,
+        "tool": "save_price",
+        "args": {
+          "product_id": "tv",
+          "price": 1249.0
+        },
+        "tokens": 13250,
+        "costUsd": 0.0586,
+        "testsPassing": 3,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:29.437+00:00",
+        "result": "saved tv = $1249.00"
+      },
+      {
+        "id": 10,
+        "workerId": "worker-1",
+        "step": 10,
+        "tool": "fetch_page",
+        "args": {
+          "url": "https://shop-a.example/products/desk-lamp"
+        },
+        "tokens": 14350,
+        "costUsd": 0.063,
+        "testsPassing": 3,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:29.743+00:00",
+        "result": "HTTP 200, 214 bytes"
+      },
+      {
+        "id": 11,
+        "workerId": "worker-1",
+        "step": 11,
+        "tool": "save_price",
+        "args": {
+          "product_id": "lamp",
+          "price": 22.0
+        },
+        "tokens": 15450,
+        "costUsd": 0.0674,
+        "testsPassing": 4,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:30.046+00:00",
+        "result": "saved lamp = $22.00"
+      },
+      {
+        "id": 12,
+        "workerId": "worker-1",
+        "step": 12,
+        "tool": "fetch_page",
+        "args": {
+          "url": "https://shop-a.example/products/headphones"
+        },
+        "tokens": 16550,
+        "costUsd": 0.0718,
+        "testsPassing": 4,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:30.353+00:00",
+        "result": "HTTP 200, 456 bytes"
+      },
+      {
+        "id": 13,
+        "workerId": "worker-1",
+        "step": 13,
+        "tool": "save_price",
+        "args": {
+          "product_id": "headphones",
+          "price": 89.0
+        },
+        "tokens": 17650,
+        "costUsd": 0.0762,
+        "testsPassing": 5,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:30.658+00:00",
+        "result": "saved headphones = $89.00"
+      },
+      {
+        "id": 14,
+        "workerId": "worker-1",
+        "step": 14,
+        "tool": "fetch_page",
+        "args": {
+          "url": "https://shop-c.example/p/burr-grinder"
+        },
+        "tokens": 18750,
+        "costUsd": 0.0806,
+        "testsPassing": 5,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:30.962+00:00",
+        "error": "HTTP 503 from shop-c.example: Service temporarily unavailable. Please retry later. (Retry-After: 30)",
+        "result": "HTTP 503 from shop-c.example: Service temporarily unavailable. Please retry later. (Retry-After: 30)"
+      },
+      {
+        "id": 15,
+        "workerId": "worker-1",
+        "step": 15,
+        "tool": "fetch_page",
+        "args": {
+          "url": "https://shop-c.example/p/burr-grinder"
+        },
+        "tokens": 19850,
+        "costUsd": 0.085,
+        "testsPassing": 5,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:31.272+00:00",
+        "error": "HTTP 503 from shop-c.example: Service temporarily unavailable. Please retry later. (Retry-After: 30)",
+        "result": "HTTP 503 from shop-c.example: Service temporarily unavailable. Please retry later. (Retry-After: 30)"
+      },
+      {
+        "id": 16,
+        "workerId": "worker-1",
+        "step": 16,
+        "tool": "list_products",
+        "args": {},
+        "tokens": 20950,
+        "costUsd": 0.0894,
+        "testsPassing": 5,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:31.578+00:00",
+        "result": "6 products"
+      },
+      {
+        "id": 17,
+        "workerId": "worker-1",
+        "step": 17,
+        "tool": "fetch_page",
+        "args": {
+          "url": "https://shop-c.example/"
+        },
+        "tokens": 22050,
+        "costUsd": 0.0938,
+        "testsPassing": 5,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:31.883+00:00",
+        "error": "HTTP 503 from shop-c.example: Service temporarily unavailable. Please retry later. (Retry-After: 30)",
+        "result": "HTTP 503 from shop-c.example: Service temporarily unavailable. Please retry later. (Retry-After: 30)"
+      },
+      {
+        "id": 18,
+        "workerId": "worker-1",
+        "step": 18,
+        "tool": "fetch_page",
+        "args": {
+          "url": "https://shop-c.example/p/burr-grinder"
+        },
+        "tokens": 23150,
+        "costUsd": 0.0982,
+        "testsPassing": 5,
+        "testsTotal": 6,
+        "timestamp": "2026-10-24T22:13:32.206+00:00",
+        "error": "HTTP 503 from shop-c.example: Service temporarily unavailable. Please retry later. (Retry-After: 30)",
+        "result": "HTTP 503 from shop-c.example: Service temporarily unavailable. Please retry later. (Retry-After: 30)"
+      }
+    ],
+    "testProgress": [
+      {
+        "step": 1,
+        "testsPassing": 0,
+        "testsTotal": 6
+      },
+      {
+        "step": 2,
+        "testsPassing": 0,
+        "testsTotal": 6
+      },
+      {
+        "step": 3,
+        "testsPassing": 1,
+        "testsTotal": 6
+      },
+      {
+        "step": 4,
+        "testsPassing": 1,
+        "testsTotal": 6
+      },
+      {
+        "step": 5,
+        "testsPassing": 1,
+        "testsTotal": 6
+      },
+      {
+        "step": 6,
+        "testsPassing": 1,
+        "testsTotal": 6
+      },
+      {
+        "step": 7,
+        "testsPassing": 2,
+        "testsTotal": 6
+      },
+      {
+        "step": 8,
+        "testsPassing": 2,
+        "testsTotal": 6
+      },
+      {
+        "step": 9,
+        "testsPassing": 3,
+        "testsTotal": 6
+      },
+      {
+        "step": 10,
+        "testsPassing": 3,
+        "testsTotal": 6
+      },
+      {
+        "step": 11,
+        "testsPassing": 4,
+        "testsTotal": 6
+      },
+      {
+        "step": 12,
+        "testsPassing": 4,
+        "testsTotal": 6
+      },
+      {
+        "step": 13,
+        "testsPassing": 5,
+        "testsTotal": 6
+      },
+      {
+        "step": 14,
+        "testsPassing": 5,
+        "testsTotal": 6
+      },
+      {
+        "step": 15,
+        "testsPassing": 5,
+        "testsTotal": 6
+      },
+      {
+        "step": 16,
+        "testsPassing": 5,
+        "testsTotal": 6
+      },
+      {
+        "step": 17,
+        "testsPassing": 5,
+        "testsTotal": 6
+      },
+      {
+        "step": 18,
+        "testsPassing": 5,
+        "testsTotal": 6
+      }
+    ],
+    "spend": {
+      "costUsd": 1.0944,
+      "budgetUsd": 2.0
+    },
+    "task": "Build today's price report. For every product from list_products, fetch its page and save its current price with save_price."
+  },
+  "verdict": {
+    "expected": "change_strategy: stop retrying the 503 store; flag its products for a human."
+  }
+}

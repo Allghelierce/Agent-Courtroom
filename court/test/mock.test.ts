@@ -69,3 +69,31 @@ test("onTrial receives the finished trial", async () => {
   const trial = await holdTrial(packet, { mock: true, onTrial: (t) => void (seen = t.id) });
   assert.equal(seen, trial.id);
 });
+
+// Premature stall: a stalling charge whose window has at most one test run and no tool errors.
+function stall(tools: string[], toolError = false) {
+  const evts = tools.map((tool, i) =>
+    ev(i + 1, tool, tool === "run_tests" ? {} : { path: "src/dates.ts" }, {
+      testsPassing: 2,
+      testsTotal: 12,
+      result: tool === "run_tests" ? "2/12 passing; failing: test_due_date_tz" : "read 30 lines",
+      ...(toolError && i === 1 ? { error: "old_str not found" } : {}),
+    }),
+  );
+  return buildPacket({ workerId: "w", kind: "stalling", summary: "stuck at 2/12", eventIds: evts.map((e) => e.id) }, evts, { budgetUsd: 1 });
+}
+
+test("mock court rules continue on a premature stall (one test run, no tool errors)", async () => {
+  const trial = await holdTrial(stall(["run_tests", "read_file", "read_file", "edit_file", "read_file", "edit_file"]), { mock: true });
+  assert.equal(trial.verdict.ruling, "continue");
+});
+
+test("a stall with two or more test runs is not premature", async () => {
+  const trial = await holdTrial(stall(["run_tests", "read_file", "edit_file", "run_tests", "edit_file", "read_file"]), { mock: true });
+  assert.notEqual(trial.verdict.ruling, "continue");
+});
+
+test("a stall with a tool error is not premature", async () => {
+  const trial = await holdTrial(stall(["run_tests", "edit_file", "read_file", "edit_file", "read_file", "edit_file"], true), { mock: true });
+  assert.notEqual(trial.verdict.ruling, "continue");
+});

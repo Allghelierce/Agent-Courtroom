@@ -36,15 +36,18 @@ test("progress comes from testProgress, including steps outside the event window
   const ep = enginePacket();
   const p = fromEnginePacket(ep);
   assert.deepEqual(p.progress, ep.testProgress);
-  // The window is all at 11 passing; only the full history shows the rise to 11 at step 11.
-  assert.equal(p.stats.stepsSinceProgress, 5);
-  assert.equal(p.stats.totalSteps, 16);
+  // Only the full history shows where tests last rose; the 6-event window may sit on the plateau.
+  const peak = ep.testProgress.reduce((b, x) => (x.testsPassing > b.testsPassing ? x : b)).step;
+  const last = ep.testProgress.at(-1)!.step;
+  assert.equal(p.stats.stepsSinceProgress, last - peak);
+  assert.equal(p.stats.totalSteps, last);
 });
 
 test("testProgress past the last event extends stepsSinceProgress", () => {
   const ep = enginePacket();
-  const p = fromEnginePacket({ ...ep, testProgress: [...ep.testProgress, { step: 20, testsPassing: 11, testsTotal: 12 }] });
-  assert.equal(p.stats.stepsSinceProgress, 9);
+  const peak = ep.testProgress.reduce((b, x) => (x.testsPassing > b.testsPassing ? x : b));
+  const p = fromEnginePacket({ ...ep, testProgress: [...ep.testProgress, { step: 30, testsPassing: peak.testsPassing, testsTotal: peak.testsTotal }] });
+  assert.equal(p.stats.stepsSinceProgress, 30 - peak.step);
 });
 
 test("renderPacket shows the task and event results", () => {

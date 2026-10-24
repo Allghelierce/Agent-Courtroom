@@ -7,6 +7,8 @@ import { loadFixture } from "./helpers.ts";
 
 const { events, charge, budgetUsd } = loadFixture();
 const packet = buildPacket(charge, events, { budgetUsd });
+const [c1, c2] = charge.eventIds;
+const cLast = charge.eventIds.at(-1)!;
 
 const usage = { input_tokens: 1000, output_tokens: 200 };
 
@@ -15,7 +17,7 @@ function lawyerReply() {
     model: LAWYER_MODEL,
     stop_reason: "end_turn",
     usage,
-    parsed_output: { argument: "The worker is looping.", cited_events: [12, 14, 999], recommended_ruling: "change_strategy" },
+    parsed_output: { argument: "The worker is looping.", cited_events: [c1, c2, 999], recommended_ruling: "change_strategy" },
   };
 }
 
@@ -33,7 +35,7 @@ test("real-model path returns the judge's normalized verdict", async () => {
     model: JUDGE_MODEL,
     stop_reason: "end_turn",
     usage,
-    parsed_output: { ruling: "change_strategy", instruction: "Mock the rates API.", reasoning: "Looping.", cited_events: [12, 16, 404] },
+    parsed_output: { ruling: "change_strategy", instruction: "Mock the rates API.", reasoning: "Looping.", cited_events: [c1, cLast, 404] },
   }));
   const trial = await holdTrial(packet, { mock: false, client });
   assert.equal(trial.mock, false);
@@ -41,9 +43,9 @@ test("real-model path returns the judge's normalized verdict", async () => {
   assert.deepEqual(calls, { lawyer: 2, judge: 1 });
   assert.equal(trial.verdict.ruling, "change_strategy");
   assert.equal(trial.verdict.instruction, "Mock the rates API.");
-  assert.deepEqual(trial.verdict.cited_events, [12, 16]);
-  assert.deepEqual(trial.prosecution.cited_events, [12, 14]);
-  assert.deepEqual(trial.defense.cited_events, [12, 14]);
+  assert.deepEqual(trial.verdict.cited_events, [c1, cLast]);
+  assert.deepEqual(trial.prosecution.cited_events, [c1, c2]);
+  assert.deepEqual(trial.defense.cited_events, [c1, c2]);
   assert.ok(trial.costUsd > 0);
 });
 

@@ -243,3 +243,41 @@ test("rulesConfig reads the env and falls back on bad or negative values", () =>
   }
   assert.equal(rulesConfig({ COURT_RULES: "on" }).enabled, true);
 });
+
+// ---- regressions (fixed in 0fb2fa6) ----
+
+test("regression: blank or whitespace env values count as unset, not 0", () => {
+  const defaults = rulesConfig({});
+  for (const blank of ["", "   ", "\t"]) {
+    const cfg = rulesConfig({ COURT_BUDGET_FRACTION: blank, COURT_BUDGET_FLOOR_USD: blank, COURT_MAX_TRIALS_PER_HOUR: blank, COURT_REPEAT_WINDOW_MIN: blank });
+    assert.deepEqual(cfg, defaults, `${JSON.stringify(blank)} should fall back to the defaults`);
+  }
+  assert.equal(rulesConfig({ COURT_MAX_TRIALS_PER_HOUR: " 3 " }).maxTrialsPerHour, 3, "surrounding spaces are trimmed");
+  // The bug's symptom: a blank COURT_MAX_TRIALS_PER_HOUR blocked every trial, even with no history.
+  assert.equal(sj([], rulesConfig({ COURT_MAX_TRIALS_PER_HOUR: "" })), null);
+});
+
+test("regression: a $0 court cap doesn't block a trial when nothing has been spent", () => {
+  const zero = { ...CFG, budgetFloorUsd: 0, budgetFraction: 0 };
+  assert.equal(sj([], zero), null, "first charge, no history");
+  assert.equal(sj([past("case-a", 10, "continue"), past("case-b", 5, "continue")], zero), null, "earlier trials that cost $0 (mock)");
+  const s = sj([past("case-a", 10, "continue", { costUsd: 0.001 })], zero);
+  assert.equal(s?.kind, "court_budget", "any real spend is over a $0 cap");
+  const free = { ...packet, spend: { ...packet.spend, usd: 0 } };
+  assert.equal(sj([], { ...CFG, budgetFloorUsd: 0 }, NOW, free), null, "floor 0 and a worker that has spent nothing");
+});
+
+test("regression: a gap that rounds to 1 minute reads '1 minute', not '1 minutes'", () => {
+  for (const minutes of [1, 1.4]) {
+    const s = sj([past("case-cs", minutes, "change_strategy")]);
+    assert.match(s!.verdict.reasoning, /\b1 minute after case-cs/);
+    assert.match(s!.prosecution, /\b1 minute after case-cs/);
+    assert.doesNotMatch(`${s!.verdict.reasoning} ${s!.prosecution}`, /1 minutes/);
+  }
+  const esc = past("case-esc", 1, "escalate", { summary: "repeat_offender" });
+  const halt = sj([esc]);
+  assert.equal(halt?.verdict.ruling, "halt");
+  assert.match(halt.verdict.reasoning, /a repeat offense 1 minute ago/);
+  assert.match(sj([past("case-cs", 2, "change_strategy")])!.verdict.reasoning, /\b2 minutes after/);
+  assert.match(sj([past("case-cs", 0.5, "change_strategy")])!.verdict.reasoning, /under a minute after/);
+});

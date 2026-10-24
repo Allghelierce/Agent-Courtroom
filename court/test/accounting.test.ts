@@ -247,9 +247,10 @@ test("missing price list: court.ts still loads, costOf is null, a real-path tria
   assert.match(stderr, /no price list at \/nonexistent\/model-prices\.json/);
 });
 
-test("COURT_PRICES_PATH pointing at a real price list prices the trial (control for the test above)", () => {
+test("COURT_PRICES_PATH unset, blank, or pointing at a real price list prices the trial (control for the test above)", () => {
   const shared = new URL("../../shared/model-prices.json", import.meta.url).pathname;
-  for (const path of [undefined, shared]) {
+  // Blank means unset (6db4c5e), so it falls back to the shared list instead of reading the path "".
+  for (const path of [undefined, shared, "", "   "]) {
     const { cost, trial, stderr } = courtWithPrices(path);
     close(cost!, usd("claude-opus-5-5", 1000, 200));
     assert.equal(trial.costComplete, true);

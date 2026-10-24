@@ -32,8 +32,8 @@ def main():
     parser.add_argument("--tasks", nargs="+", choices=("coding", "prices"), default=["coding", "prices"])
     parser.add_argument("--repetitions", type=int, default=3)
     parser.add_argument("--court", default="http://127.0.0.1:4100/verdict")
-    parser.add_argument("--brain", choices=("scripted", "claude"), default="scripted")
-    parser.add_argument("--model", default="claude-opus-5-5")
+    parser.add_argument("--brain", choices=("scripted", "claude", "groq"), default="scripted")
+    parser.add_argument("--model", help="Defaults to the selected provider's worker model")
     parser.add_argument("--budget", type=float, default=2.0)
     parser.add_argument("--max-steps", type=int, default=30)
     parser.add_argument("--output", type=Path)
@@ -41,8 +41,10 @@ def main():
     args = parser.parse_args()
     if not 1 <= args.repetitions <= 20:
         parser.error("--repetitions must be between 1 and 20")
-    if args.brain == "claude" and (not args.success_criteria or not os.environ.get("ANTHROPIC_API_KEY")):
-        parser.error("Real comparisons require --success-criteria and ANTHROPIC_API_KEY")
+    if args.brain != "scripted":
+        key = "GROQ_API_KEY" if args.brain == "groq" else "ANTHROPIC_API_KEY"
+        if not args.success_criteria or not os.environ.get(key):
+            parser.error(f"Real comparisons require --success-criteria and {key}")
     out = args.output or ROOT / "runs/benchmarks" / datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
     out.mkdir(parents=True, exist_ok=False)
     bus = Bus(record_path=out / "events.jsonl", db_path=out / "events.sqlite")

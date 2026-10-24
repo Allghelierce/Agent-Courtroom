@@ -62,15 +62,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workers", type=int, choices=range(0, 6), default=3)
     parser.add_argument("--no-ui", action="store_true")
-    parser.add_argument("--live", action="store_true", help="Use real workers and court; requires credentials and incurs model cost")
     parser.add_argument("--duration", type=float, help="Stop after this many seconds; default waits for Ctrl-C")
     parser.add_argument("--step-delay", type=float, default=0.5)
     parser.add_argument("--db", type=Path, default=ROOT / "runs/demo/events.sqlite")
     args = parser.parse_args()
-    if args.live and not os.environ.get("ANTHROPIC_API_KEY"):
-        parser.error("--live requires ANTHROPIC_API_KEY in the environment")
-    if args.live:
-        parser.error("Live execution is not enabled in this launcher yet: confirm benchmark rules and worker execution isolation first. Use the engine CLI for an explicitly configured run.")
     node = node_binary()
     logs = ROOT / "runs/demo" / time.strftime("%Y%m%d-%H%M%S")
     logs.mkdir(parents=True, exist_ok=True)

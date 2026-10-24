@@ -11,14 +11,15 @@ from . import monitors
 from .brains import ClaudeBrain, ScriptedBrain
 from .bus import Bus
 from .court import HttpCourt, StubCourt
+from .tasks import TASKS, Task
 from .worker import Worker
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_SEED = REPO_ROOT / "seed_repos" / "checkout"
 
 
 @dataclass
 class RunConfig:
+    task: str = "coding"  # a key of tasks.TASKS
     brain: str = "scripted"  # "scripted" or "claude"
     court: str = "stub"  # "stub", "none", or the URL of Person B's convene endpoint
     model: str = "claude-opus-5-5"
@@ -26,22 +27,28 @@ class RunConfig:
     max_steps: int = 60
     all_monitors: bool = False
     step_delay: float = 0.0  # scripted brain only
-    seed_repo: Path = DEFAULT_SEED
+    seed: Optional[Path] = None  # defaults to the task's own seed
 
 
-def make_brain(cfg: RunConfig):
+def get_task(name: str) -> Task:
+    if name not in TASKS:
+        raise ValueError(f"unknown task: {name} (choose from {', '.join(TASKS)})")
+    return TASKS[name]
+
+
+def make_brain(cfg: RunConfig, task: Task):
     if cfg.brain == "claude":
-        return ClaudeBrain(model=cfg.model)
+        return ClaudeBrain(task, model=cfg.model)
     if cfg.brain == "scripted":
-        return ScriptedBrain(model=cfg.model, step_delay=cfg.step_delay)
+        return ScriptedBrain(task, model=cfg.model, step_delay=cfg.step_delay)
     raise ValueError(f"unknown brain: {cfg.brain}")
 
 
-def make_court(spec: str):
+def make_court(spec: str, task: Task):
     if spec == "none":
         return None
     if spec == "stub":
-        return StubCourt()
+        return StubCourt(task.stub_instruction)
     if spec.startswith(("http://", "https://")):
         return HttpCourt(spec)
     raise ValueError(f"unknown court: {spec}")
@@ -55,15 +62,17 @@ class Engine:
         self._counter = 0
 
     def create_worker(self, cfg: RunConfig, court: Optional[str] = None, label: str = "worker") -> Worker:
+        task = get_task(cfg.task)
         with self._lock:
             self._counter += 1
             worker_id = f"{label}-{self._counter}"
         worker = Worker(
             worker_id,
-            make_brain(cfg),
-            cfg.seed_repo,
+            task,
+            make_brain(cfg, task),
             self.bus,
-            make_court(court if court is not None else cfg.court),
+            make_court(court if court is not None else cfg.court, task),
+            seed=cfg.seed,
             budget_usd=cfg.budget_usd,
             max_steps=cfg.max_steps,
             enabled_monitors=tuple(monitors.ALL_MONITORS) if cfg.all_monitors else monitors.MVP_MONITORS,

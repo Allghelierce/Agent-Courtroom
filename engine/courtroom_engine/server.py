@@ -25,6 +25,7 @@ HEARTBEAT_SECONDS = 15
 
 def _overrides(cfg: RunConfig, body: dict[str, Any]) -> RunConfig:
     fields = {
+        "task": "task",
         "brain": "brain",
         "court": "court",
         "model": "model",

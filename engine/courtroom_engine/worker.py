@@ -9,11 +9,10 @@ from pathlib import Path
 from typing import Optional
 
 from . import monitors
-from .brains import TASK
 from .bus import Bus
 from .court import Court, build_packet
-from .sandbox import Sandbox
 from .schema import Charge, Event, Verdict, WorkerStatus
+from .tasks import Env, Task
 
 HUMAN_WAIT_SECONDS = 600
 
@@ -26,31 +25,33 @@ class Worker:
     def __init__(
         self,
         worker_id: str,
+        task: Task,
         brain,
-        seed_repo: Path,
         bus: Bus,
         court: Optional[Court],
         budget_usd: float = 2.0,
         max_steps: int = 60,
         enabled_monitors=monitors.MVP_MONITORS,
-        keep_sandbox: bool = False,
+        seed: Optional[Path] = None,
+        keep_env: bool = False,
     ):
         self.id = worker_id
+        self.task = task
         self.brain = brain
-        self.seed_repo = seed_repo
+        self.seed = seed or task.seed
         self.bus = bus
         self.court = court
         self.budget_usd = budget_usd
         self.max_steps = max_steps
         self.enabled_monitors = enabled_monitors
-        self.keep_sandbox = keep_sandbox
+        self.keep_env = keep_env
         self.events: list[Event] = []
         self.window_start = 0  # monitors only see events after the last ruling
         self.started = 0.0
         self.status = WorkerStatus(
             workerId=worker_id,
             state="running",
-            task=TASK,
+            task=task.prompt,
             courtEnabled=court is not None,
             step=0,
             testsPassing=0,
@@ -93,20 +94,19 @@ class Worker:
 
     def run(self) -> WorkerStatus:
         self.started = time.monotonic()
-        sandbox = Sandbox(self.seed_repo)
+        env = self.task.make_env(self.seed)
         try:
-            baseline = sandbox.run_tests()
-            self.status.testsPassing, self.status.testsTotal = baseline.tests or (0, 0)
+            self.status.testsPassing, self.status.testsTotal = env.baseline()
             self._publish_status()
-            self._loop(sandbox)
+            self._loop(env)
         except Exception as e:  # a crashed worker should still end its run cleanly
             self._finish("failed", f"Worker crashed: {type(e).__name__}: {e}")
         finally:
-            if not self.keep_sandbox:
-                sandbox.cleanup()
+            if not self.keep_env:
+                env.cleanup()
         return self.status
 
-    def _loop(self, sandbox: Sandbox) -> None:
+    def _loop(self, env: Env) -> None:
         while True:
             if self.status.step >= self.max_steps:
                 return self._finish("failed", f"Hit the {self.max_steps}-step limit at {self._score()}")
@@ -117,15 +117,14 @@ class Worker:
             self.status.costUsd += action.cost_usd
 
             if action.tool is None:
-                final = sandbox.run_tests()
-                self.status.testsPassing, self.status.testsTotal = final.tests or (0, 0)
+                self.status.testsPassing, self.status.testsTotal = env.baseline()
                 if self._all_passing():
-                    return self._finish("succeeded", f"All {self.status.testsTotal} tests pass. {action.text}".strip())
+                    return self._finish("succeeded", f"Finished at {self._score()}. {action.text}".strip())
                 return self._finish("failed", f"Worker stopped at {self._score()}: {action.text}".strip())
 
-            outcome = sandbox.execute(action.tool, action.args)
-            if outcome.tests:
-                self.status.testsPassing, self.status.testsTotal = outcome.tests
+            outcome = env.execute(action.tool, action.args)
+            if outcome.progress:
+                self.status.testsPassing, self.status.testsTotal = outcome.progress
             self.status.step += 1
             event = Event(
                 id=self.bus.next_event_id(),
@@ -145,10 +144,8 @@ class Worker:
             self.bus.publish("event", event.to_json())
             self._publish_status()
 
-            if action.tool == "run_tests" and self._all_passing():
-                return self._finish(
-                    "succeeded", f"All {self.status.testsTotal} tests pass after {self.status.step} steps"
-                )
+            if outcome.progress and self._all_passing():
+                return self._finish("succeeded", f"Finished at {self._score()} after {self.status.step} steps")
 
             instruction = None
             verdict = self._check_monitors()
@@ -176,7 +173,7 @@ class Worker:
             return None  # without a court the warning light flashes and nobody acts
 
         self._set_state("on_trial")
-        verdict = self.court.convene(build_packet(charge, self.events, self.budget_usd, TASK))
+        verdict = self.court.convene(build_packet(charge, self.events, self.budget_usd, self.task.prompt))
         self._publish_verdict(charge, verdict)
         if verdict.ruling == "escalate":
             verdict = self._wait_for_human(charge)
@@ -201,4 +198,5 @@ class Worker:
         return self.status.testsTotal > 0 and self.status.testsPassing == self.status.testsTotal
 
     def _score(self) -> str:
-        return f"{self.status.testsPassing}/{self.status.testsTotal} tests passing"
+        unit = "tests passing" if self.task.name == "coding" else "done"
+        return f"{self.status.testsPassing}/{self.status.testsTotal} {unit}"

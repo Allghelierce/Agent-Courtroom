@@ -15,13 +15,6 @@ from .schema import Charge, Event, Verdict
 
 PACKET_EVENTS = 20
 
-STUB_INSTRUCTION = (
-    "Stop changing payments.py. The payments gateway is unreachable from this sandbox, so "
-    "test_checkout_charges_the_gateway cannot pass against it. Mock payments.charge in that "
-    "test with unittest.mock.patch (like test_receipt_amount does), leave a comment flagging it "
-    "for a human to verify against staging, and finish the rest of the suite."
-)
-
 
 def build_packet(charge: Charge, events: list[Event], budget_usd: float, task: str) -> dict[str, Any]:
     mine = [e for e in events if e.workerId == charge.workerId]
@@ -41,13 +34,16 @@ class Court(Protocol):
 
 
 class StubCourt:
-    """Always rules change_strategy, citing the charged events."""
+    """Always rules change_strategy with the task's canned advice, citing the charged events."""
+
+    def __init__(self, instruction: str):
+        self.instruction = instruction
 
     def convene(self, packet: dict[str, Any]) -> Verdict:
         charge = packet["charge"]
         return Verdict(
             ruling="change_strategy",
-            instruction=STUB_INSTRUCTION,
+            instruction=self.instruction,
             reasoning=f"[stub court] {charge['kind']}: {charge['summary']}",
             cited_events=charge["eventIds"],
         )

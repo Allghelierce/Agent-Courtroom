@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .bus import Bus
 from .engine import REPO_ROOT, Engine, RunConfig
+from .tasks import TASKS
 from .server import serve
 
 RUNS_DIR = REPO_ROOT / "runs"
@@ -50,13 +51,14 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("run", "compare", "serve"):
         p = sub.add_parser(name)
+        p.add_argument("--task", default="coding", choices=list(TASKS), help="which kind of worker")
         p.add_argument("--brain", default="scripted", choices=["scripted", "claude"])
         p.add_argument("--court", default="stub", help='"stub", "none", or a convene URL')
         p.add_argument("--model", default="claude-opus-5-5")
         p.add_argument("--budget", type=float, default=2.0, help="USD per worker")
         p.add_argument("--max-steps", type=int, default=60)
         p.add_argument("--all-monitors", action="store_true", help="also run overspending and flailing")
-        p.add_argument("--seed-repo", type=Path, default=RunConfig.seed_repo)
+        p.add_argument("--seed", type=Path, help="override the task's seed repo or data")
         p.add_argument("--step-delay", type=float, default=1.0 if name == "serve" else 0.0,
                        help="seconds per scripted step (default 1 for serve, 0 otherwise)")
         p.add_argument("--record", type=Path, help="write every stream message to this .jsonl file")
@@ -67,6 +69,7 @@ def main() -> None:
     args = parser.parse_args()
 
     cfg = RunConfig(
+        task=args.task,
         brain=args.brain,
         court=args.court,
         model=args.model,
@@ -74,7 +77,7 @@ def main() -> None:
         max_steps=args.max_steps,
         all_monitors=args.all_monitors,
         step_delay=args.step_delay,
-        seed_repo=args.seed_repo.resolve(),
+        seed=args.seed.resolve() if args.seed else None,
     )
     record = args.record or RUNS_DIR / f"{datetime.now():%Y%m%d-%H%M%S}-{args.command}.jsonl"
     bus = Bus(record_path=record)

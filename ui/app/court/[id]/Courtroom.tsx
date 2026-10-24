@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { CourtScene } from "@/components/CourtScene";
+import { useIntegerScale } from "@/components/PixelCanvas";
 import { PixelIcon, RulingTag, StatusTag } from "@/components/Pieces";
 import { Portrait } from "@/components/Sprites";
 import { CHARGE_PHRASE, COURT_URL, ENGINE_URL, RULING_COLOR, RULING_LABEL, describeEvent, eventFailed, usd, type Event, type Trial } from "@/lib/data";
 import { useLive } from "@/lib/live";
 import { buildScript, type Line } from "@/lib/script";
 import { blip, gavel, objection, setSoundEnabled } from "@/lib/sound";
-import { CAST } from "@/lib/sprites";
+import { CAST, SCENE_W } from "@/lib/sprites";
 import { useCaseContext } from "@/lib/case";
 import { DEMO_TRIALS, type WorkerStatus } from "@/lib/stream";
 import { CaseRecord } from "./CaseRecord";
@@ -56,7 +57,7 @@ export function Courtroom() {
     const loading = trial === undefined;
     return (
       <div className="px-box flex flex-col items-start gap-4 p-6">
-        <h1 className="text-[28px]">{loading ? "Calling the court to order..." : "No case with that number"}</h1>
+        <h1 className="text-[40px]">{loading ? "Calling the court to order..." : "No case with that number"}</h1>
         {!loading && <p className="m-0">Case {id} isn&apos;t in the case log. Pick a trial from the list to watch it.</p>}
         <Link href="/cases" className="px-btn">Open the case log</Link>
       </div>
@@ -68,7 +69,7 @@ export function Courtroom() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
           <Link href="/cases" className="text-sm text-soft">Back to the case log</Link>
-          <h1 className="text-[28px]">
+          <h1 className="text-[40px]">
             {trial.workerId} is charged with {CHARGE_PHRASE[trial.charge.kind]}
           </h1>
           <span className="text-sm text-soft">Case {trial.id}</span>
@@ -95,6 +96,9 @@ export function Courtroom() {
 
 function TrialView({ trial }: { trial: Trial }) {
   const { events, outcome } = useCaseContext(trial);
+  // On wide screens the stage hugs the courtroom at a whole-number scale (up to 4x), so there are no bands beside the
+  // scene. Narrower, it stays full width so the dialogue box under the scene keeps a readable line length.
+  const [stageRef, stageScale] = useIntegerScale(SCENE_W, 4, 8);
   const script = useMemo(() => buildScript(trial, outcome), [trial, outcome]);
   const [idx, setIdx] = useState(0);
   // How much of which line has been typed; a new line starts at 0 without resetting state in an effect.
@@ -195,34 +199,37 @@ function TrialView({ trial }: { trial: Trial }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div key={cutIn ? idx : "stage"} className={`relative overflow-hidden border-4 border-edge bg-[#2a1d4a] ${cutIn ? "shake" : ""}`} style={{ boxShadow: "4px 4px 0 var(--shadow)" }}>
-        <button type="button" onClick={advance} aria-label="Next line" className="block w-full cursor-pointer border-0 bg-transparent p-0">
-          <CourtScene
-            speaker={line.who}
-            moods={{ ...line.moods, [line.who]: line.mood }}
-            swirl={trial.charge.kind === "looping" && !reachedVerdict}
-            gavelDown={line.verdict}
-            workerLabel={trial.workerId}
-          />
-        </button>
+      <div ref={stageRef} className="w-full">
+        <div key={cutIn ? idx : "stage"} className={`relative mx-auto w-full max-w-full overflow-hidden border-4 border-edge bg-[#2a1d4a] lg:w-[var(--stage-w)] ${cutIn ? "shake" : ""}`} style={{ "--stage-w": `${SCENE_W * stageScale + 8}px`, boxShadow: "4px 4px 0 var(--shadow)" } as React.CSSProperties}>
+          <button type="button" onClick={advance} aria-label="Next line" className="block w-full cursor-pointer border-0 bg-transparent p-0">
+            <CourtScene
+              speaker={line.who}
+              moods={{ ...line.moods, [line.who]: line.mood }}
+              swirl={trial.charge.kind === "looping" && !reachedVerdict}
+              gavelDown={line.verdict}
+              workerLabel={trial.workerId}
+              scale={stageScale}
+            />
+          </button>
 
-        {evidence.length > 0 && <SceneEvidence key={idx} events={evidence.slice(-3)} />}
-        {line.burst && still && <div className={`burst show ${line.burst.tone}`} aria-hidden>{line.burst.text}</div>}
-        {cutIn && <CutIn line={line} />}
-        {line.verdict && cutIn && <div key={`flash-${idx}`} className="flash late pointer-events-none absolute inset-0" aria-hidden />}
-        {line.verdict && <VerdictStamp trial={trial} late={cutIn} />}
-        {idx === 0 && !still && <Curtain />}
+          {evidence.length > 0 && <SceneEvidence key={idx} events={evidence.slice(-3)} />}
+          {line.burst && still && <div className={`burst show ${line.burst.tone}`} aria-hidden>{line.burst.text}</div>}
+          {cutIn && <CutIn line={line} />}
+          {line.verdict && cutIn && <div key={`flash-${idx}`} className="flash late pointer-events-none absolute inset-0" aria-hidden />}
+          {line.verdict && <VerdictStamp trial={trial} late={cutIn} />}
+          {idx === 0 && !still && <Curtain />}
 
-        {/* The dialogue box sits over the floor on wide screens, visual-novel style, and below the scene on phones. */}
-        <div className="vn border-t-4 border-edge bg-panel lg:absolute lg:inset-x-0 lg:bottom-4 lg:mx-auto lg:max-w-[960px] lg:border-4 lg:shadow-[4px_4px_0_var(--shadow)]" aria-live="polite">
-          <div className="flex gap-4 p-3">
-            <div className={`hidden shrink-0 self-start border-4 border-edge sm:block ${done ? "" : "talk"}`}>
-              <Portrait who={line.who} mood={line.mood} scale={2} />
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <span key={idx} className="px-tag tag-in self-start" style={{ background: cast.tag, color: "var(--on-accent)" }}>{name}</span>
-              <p className="m-0 min-h-[4em] text-[20px] leading-snug">{line.text.slice(0, shown)}</p>
-              <span className={`self-end font-display text-sm ${done && !last ? "blink" : "invisible"}`} aria-hidden>▼</span>
+          {/* The dialogue box sits over the floor on wide screens, visual-novel style, and below the scene on phones. */}
+          <div className="vn border-t-4 border-edge bg-panel lg:absolute lg:inset-x-0 lg:bottom-4 lg:mx-auto lg:max-w-[960px] lg:border-4 lg:shadow-[4px_4px_0_var(--shadow)]" aria-live="polite">
+            <div className="flex gap-4 p-3">
+              <div className={`hidden shrink-0 self-start border-4 border-edge sm:block ${done ? "" : "talk"}`}>
+                <Portrait who={line.who} mood={line.mood} scale={2} />
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <span key={idx} className="px-tag tag-in self-start" style={{ background: cast.tag, color: "var(--on-accent)" }}>{name}</span>
+                <p className="m-0 min-h-[4em] text-[20px] leading-snug">{line.text.slice(0, shown)}</p>
+                <span className={`self-end font-display text-[20px] ${done && !last ? "blink" : "invisible"}`} aria-hidden>▼</span>
+              </div>
             </div>
           </div>
         </div>
@@ -241,7 +248,7 @@ function TrialView({ trial }: { trial: Trial }) {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="px-box flex flex-col gap-3 p-4" aria-labelledby="evidence-h">
-          <h2 id="evidence-h" className="text-[20px]">Evidence</h2>
+          <h2 id="evidence-h" className="text-[30px]">Evidence</h2>
           {evidence.length === 0 ? (
             <p className="m-0 text-sm text-soft">{line.cites?.length ? `Cites ${line.cites.map((n) => `event ${n}`).join(", ")}.` : "No events cited in this line."}</p>
           ) : (
@@ -254,7 +261,7 @@ function TrialView({ trial }: { trial: Trial }) {
         </section>
 
         <section className="px-box flex flex-col gap-3 p-4" aria-labelledby="facts-h">
-          <h2 id="facts-h" className="text-[20px]">The case</h2>
+          <h2 id="facts-h" className="text-[30px]">The case</h2>
           <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
             <dt className="text-soft">Charge</dt>
             <dd className="m-0">{trial.charge.summary}</dd>
@@ -275,7 +282,7 @@ function EventCard({ event: e, delay }: { event: Event; delay?: number }) {
   return (
     <li className={`px-inset flex flex-col gap-1 p-3 text-sm ${delay === undefined ? "" : "pop"}`} style={delay ? { animationDelay: `${delay}ms` } : undefined}>
       <div className="flex justify-between gap-2">
-        <span className="font-display">event {e.id}</span>
+        <span className="font-display text-[20px]">event {e.id}</span>
         <span>{e.testsPassing}/{e.testsTotal} tests · {usd(e.costUsd)}</span>
       </div>
       <span style={eventFailed(e) ? { color: "#ff8a9a" } : undefined}>{describeEvent(e)}</span>
@@ -291,7 +298,7 @@ function SceneEvidence({ events }: { events: Event[] }) {
       {events.map((e, i) => (
         <li key={e.id} className="pop border-4 border-shadow bg-panel px-3 py-2 text-sm shadow-[4px_4px_0_var(--shadow)]" style={{ animationDelay: `${i * 120}ms` }}>
           <div className="flex justify-between gap-2">
-            <span className="font-display" style={{ color: "var(--gold)" }}>Evidence: event {e.id}</span>
+            <span className="font-display text-[20px]" style={{ color: "var(--gold)" }}>Evidence: event {e.id}</span>
             <span>{e.testsPassing}/{e.testsTotal}</span>
           </div>
           <span className="line-clamp-1" style={eventFailed(e) ? { color: "#ff8a9a" } : undefined}>{describeEvent(e)}</span>
@@ -311,7 +318,7 @@ function CutIn({ line }: { line: Line }) {
       <div className="relative shrink-0 border-4 border-shadow">
         <Portrait who={line.who} mood={line.mood} scale={5} />
       </div>
-      <span className="relative font-display text-[clamp(32px,6vw,72px)] leading-none text-white" style={{ textShadow: "4px 4px 0 #000" }}>
+      <span className="relative font-display text-[40px] leading-none text-white lg:text-[80px]" style={{ textShadow: "4px 4px 0 #000" }}>
         {text}
       </span>
     </div>
@@ -325,7 +332,7 @@ function Curtain() {
       <div className="half l" />
       <div className="half r" />
       <div className="call absolute inset-0 flex items-center justify-center">
-        <span className="border-4 border-shadow bg-gold px-5 py-3 font-display text-[clamp(24px,4vw,44px)] leading-none text-[var(--on-accent)] shadow-[4px_4px_0_var(--shadow)]">All rise</span>
+        <span className="border-4 border-shadow bg-gold px-5 py-3 font-display text-[40px] leading-none lg:text-[60px] text-[var(--on-accent)] shadow-[4px_4px_0_var(--shadow)]">All rise</span>
       </div>
     </div>
   );
@@ -335,8 +342,8 @@ function VerdictStamp({ trial, late = false }: { trial: Trial; late?: boolean })
   return (
     <div className="pointer-events-none absolute inset-0 flex items-start justify-end p-4">
       <div className={`stamp border-4 border-shadow px-5 py-3 text-center ${late ? "late" : ""}`} style={{ background: RULING_COLOR[trial.verdict.ruling], color: "var(--on-accent)", boxShadow: "4px 4px 0 var(--shadow)" }}>
-        <div className="font-display text-sm">Verdict</div>
-        <div className="font-display text-[28px] leading-none sm:text-[40px]">{RULING_LABEL[trial.verdict.ruling]}</div>
+        <div className="font-display text-[20px]">Verdict</div>
+        <div className="font-display text-[40px] leading-none sm:text-[60px]">{RULING_LABEL[trial.verdict.ruling]}</div>
       </div>
     </div>
   );
@@ -357,7 +364,7 @@ function SummaryJudgment({ trial }: { trial: Trial }) {
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <span className="px-tag self-start" style={{ background: "var(--gold)", color: "var(--on-accent)" }}>Summary judgment</span>
-          <h2 className="text-[28px]">{RULING_LABEL[trial.verdict.ruling]}, no trial needed</h2>
+          <h2 className="text-[40px]">{RULING_LABEL[trial.verdict.ruling]}, no trial needed</h2>
           <p className="m-0 text-[20px] leading-snug">{trial.summary ? SUMMARY_REASON[trial.summary] : ""}</p>
           <p className="m-0">{trial.verdict.reasoning}</p>
           {trial.priorCaseIds && trial.priorCaseIds.length > 0 && (
@@ -383,7 +390,7 @@ function AfterVerdict({ trial, outcome, events }: { trial: Trial; outcome?: Work
   return (
     <section className="px-box pop flex flex-col gap-4 p-4" style={{ borderColor: RULING_COLOR[trial.verdict.ruling] }} aria-labelledby="after-h">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="after-h" className="text-[20px]">After the verdict</h2>
+        <h2 id="after-h" className="text-[30px]">After the verdict</h2>
         {outcome ? <StatusTag state={outcome.state} /> : <span className="text-sm text-soft">{trial.workerId} is still running...</span>}
       </div>
       {trial.verdict.instruction && (
@@ -403,7 +410,7 @@ function AfterVerdict({ trial, outcome, events }: { trial: Trial; outcome?: Work
         </div>
       )}
       {outcome?.summary && (
-        <p className="m-0 font-display text-[20px]" style={{ color: outcome.state === "succeeded" ? "var(--green)" : "var(--soft)" }}>
+        <p className="m-0 font-display text-[30px]" style={{ color: outcome.state === "succeeded" ? "var(--green)" : "var(--soft)" }}>
           {outcome.summary.replace(/\.$/, "")}. {usd(outcome.costUsd)} spent in total.
         </p>
       )}

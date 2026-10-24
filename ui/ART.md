@@ -7,8 +7,9 @@ Read this before you touch anything visual, so the dashboard, the courtroom and 
 **The courtroom is the face. The numbers prove it works.**
 
 - **The courtroom leads.** The dashboard opens on the courtroom scene: the live trial while court is in session, otherwise the latest intervention. Then the impact numbers (saved vs. unsupervised, interventions, cost of oversight), the with/without comparison, the monitor rules, the workers, the interventions table and the activity log.
-- **Pixel chrome, readable data.** Every surface is pixel art: 4px borders, hard shadows, Pixelify headings, pixel buttons and tags. But text, numbers and tables are IBM Plex Sans with tabular figures, so the data reads like a real tool, not a game menu.
-- **The courtroom's own text stays in-world.** The dialogue box and the evidence pinned in the scene use DotGothic16 (the `.vn` class); cut-ins and the stamp use Pixelify.
+- **Pixel chrome, readable data.** Every surface is pixel art: 4px borders, hard shadows, Jersey 10 headings, pixel buttons and tags. But text, numbers and tables are IBM Plex Sans with tabular figures, so the data reads like a real tool, not a game menu.
+- **Sharp by construction.** The page is 1064px wide so its content (1032px) is exactly the courtroom at 4x plus its frame, and the dashboard's scene sits at exactly 2x in a 520px column. Frames hug the canvas (`FramedScene`, `useIntegerScale`), so the art is never letterboxed or scaled by a fraction. Sections share one four-column rhythm: impact numbers, monitors, worker cards.
+- **The courtroom's own text stays in-world.** The dialogue box and the evidence pinned in the scene use DotGothic16 (the `.vn` class); cut-ins and the stamp use Jersey 10.
 - **One plain view.** Each case also has a **Record** tab: the same case as an audit (charge, ruling, instruction sent, outcome, arguments, the evidence table, the verdict JSON). It lives inside `.console` and uses flat hairline `.card`s, `.btn`s, `.chip`s and `table.data`, for anyone checking the work. It's the only place without pixel chrome.
 - **Role colours are shared.** Gold, red, blue, green and amber mean the same thing everywhere, so a ruling chip in the Record matches the stamp in the courtroom.
 - Charges decided without a trial (summary judgment: repeat offender, court over budget) get a short ruling card instead of the full courtroom.
@@ -38,7 +39,7 @@ One dark theme: the palette of the original anime-pixel mockup. Tokens live in `
 
 | Token | Hex | Use |
 |---|---|---|
-| `--bg` | `#0b0814` | Page background: an 8px `#120d21` checker, hard 2px scanlines and sparse `--edge` pixel stars. Static. |
+| `--bg` | `#0b0814` | Page background: an 8px `#120d21` checker and sparse `--edge` pixel stars. Static. No full-page scanlines: they soften every edge and line of text. |
 | `--panel` | `#1b1430` | Panel and card fill. |
 | `--inset` | `#120c22` | Sunken areas, empty meter cells, ghost buttons. |
 | `--edge` | `#3b2f57` | Panel borders and pixel outlines in the UI. |
@@ -68,10 +69,10 @@ Status mapping (dashboard, case log, badges):
 
 ## Type
 
-- **Pixelify Sans** (500/700): headings, worker names, buttons, tags, the verdict stamp. Chunky and friendly.
+- **Jersey 10** (400 only): headings, worker names, buttons, tags, the verdict stamp, bursts and cut-ins. It's drawn on a 10px grid, so use it at **20, 30, 40, 60 or 80px** only, and never bold it (faux bold smears the pixels). Its digits are unambiguous, which matters here: it replaced Pixelify Sans, whose 5 reads as a 3 or 9 and whose C reads as an O.
 - **IBM Plex Sans** (400/500/600): body text, labels, numbers and tables, with tabular figures so numbers line up. This is what makes the data look trustworthy.
 - **DotGothic16**: the courtroom's dialogue box and in-scene evidence only (`.vn`). It's the JRPG text-box font.
-- Scale (px): **12 · 13 · 15 · 20 · 28 · 32 · 40**. Body is 15, small labels 13, dialogue 20, page titles 28, headline numbers 32, the stamp and bursts 40+.
+- Scale (px): Plex at **12 · 13 · 15 · 32** (labels, small text, body, headline numbers); Jersey 10 at **20 · 30 · 40 · 60 · 80** (buttons and tags, section titles, page titles, the stamp, bursts); DotGothic16 at **20** for dialogue.
 - Sentence case everywhere. Character names in the dialogue name tag are the only all-caps text (it's a visual-novel convention).
 - No monospace, and no typeface beyond these three.
 
@@ -80,7 +81,7 @@ Status mapping (dashboard, case log, badges):
 Use the shared classes in `app/globals.css`. Don't hand-roll borders.
 
 - `.px-box`: the standard panel. Panel fill, 4px edge border, square corners, a hard `4px 4px 0` black shadow.
-- `.px-inset`: a sunken area inside a panel (inset fill, no shadow).
+- `.px-inset`: a sunken area inside a panel (inset fill, a 2px border, no shadow). Inner frames are half the weight of outer panels, so panels read first.
 - `.px-btn`: a pressable button. It sits on a 4px shadow and drops onto it when pressed. Gold is primary, `.red` is the "watch the trial" call to action, `.ghost` is secondary.
 - `.px-tag`: a small coloured label (status badges, the dialogue name tag).
 - `.px-table`: data tables inside a `.px-box` (interventions). Pixel rules between rows, plain Plex cells.

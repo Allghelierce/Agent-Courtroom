@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 type Props = {
   width: number;
@@ -14,6 +14,21 @@ type Props = {
   label?: string;
   className?: string;
 };
+
+// The largest whole-number scale at which art `native` px wide fits the measured element (minus `chrome`, e.g. borders).
+// Measure a full-width block that doesn't depend on the art's own size, so the scale can't feed back on itself.
+export function useIntegerScale(native: number, max: number, chrome = 0): [RefObject<HTMLDivElement | null>, number] {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setScale(Math.max(1, Math.min(max, Math.floor((entry.contentRect.width - chrome) / native)))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [native, max, chrome]);
+  return [ref, scale];
+}
 
 // Draws pixel art at native size and scales it up by whole numbers only (ART.md, "The pixel grid").
 export function PixelCanvas({ width, height, render, scale, maxScale = 8, animate = false, fps = 12, label, className }: Props) {

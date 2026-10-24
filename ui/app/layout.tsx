@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { DotGothic16, IBM_Plex_Sans, Pixelify_Sans } from "next/font/google";
+import { DotGothic16, IBM_Plex_Sans, Jersey_10 } from "next/font/google";
 import { SiteHeader } from "@/components/SiteHeader";
 import { LiveProvider } from "@/lib/live";
 import "./globals.css";
 
-const pixelify = Pixelify_Sans({ variable: "--font-pixelify", subsets: ["latin"], weight: ["500", "700"] });
+// Jersey 10 is drawn on a 10px grid: use it at 20, 30, 40, 60 or 80px only, weight 400, so it stays pixel-sharp.
+const jersey = Jersey_10({ variable: "--font-jersey", subsets: ["latin"], weight: "400" });
 const dotgothic = DotGothic16({ variable: "--font-dotgothic", subsets: ["latin"], weight: "400" });
 const plex = IBM_Plex_Sans({ variable: "--font-plex", subsets: ["latin"], weight: ["400", "500", "600"] });
 
@@ -16,13 +17,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${pixelify.variable} ${dotgothic.variable} ${plex.variable}`}>
+    <html lang="en" className={`${jersey.variable} ${dotgothic.variable} ${plex.variable}`}>
       <body className="min-h-screen">
         <Suspense fallback={<div className="h-[104px]" />}>
           <SiteHeader />
         </Suspense>
         <LiveProvider>
-          <main className="mx-auto w-full max-w-[1200px] px-4 pb-16">{children}</main>
+          <main className="mx-auto w-full max-w-[1064px] px-4 pb-16">{children}</main>
         </LiveProvider>
       </body>
     </html>

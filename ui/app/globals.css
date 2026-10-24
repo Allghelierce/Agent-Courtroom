@@ -47,7 +47,7 @@
   --color-blue: var(--blue);
   --color-green: var(--green);
   --color-amber: var(--amber);
-  --font-display: var(--font-pixelify);
+  --font-display: var(--font-jersey);
   --font-body: var(--font-dotgothic);
 }
 
@@ -65,20 +65,19 @@ body {
   line-height: 1.5;
   font-variant-numeric: tabular-nums;
   background-color: var(--bg);
-  /* Night sky over the checker: two star tiles of different sizes (so the repeat doesn't show), then hard-edged
-     scanlines, then the checker. All pixels sit on the 4px grid; nothing here moves. */
+  /* Night sky over the checker: two star tiles of different sizes (so the repeat doesn't show), then the checker.
+     All pixels sit on the 4px grid; nothing here moves. */
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' shape-rendering='crispEdges'%3E%3Cg fill='%233b2f57'%3E%3Crect x='8' y='12' width='4' height='4'/%3E%3Crect x='68' y='36' width='4' height='4'/%3E%3Crect x='100' y='88' width='4' height='4'/%3E%3Crect x='32' y='104' width='4' height='4'/%3E%3Crect x='112' y='8' width='4' height='4'/%3E%3C/g%3E%3Crect x='44' y='60' width='4' height='4' fill='%23b9aed0' fill-opacity='.45'/%3E%3C/svg%3E"),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='196' height='196' shape-rendering='crispEdges'%3E%3Cg fill='%233b2f57'%3E%3Crect x='140' y='36' width='4' height='12'/%3E%3Crect x='136' y='40' width='12' height='4'/%3E%3Crect x='24' y='148' width='4' height='12'/%3E%3Crect x='20' y='152' width='12' height='4'/%3E%3Crect x='88' y='120' width='4' height='4'/%3E%3Crect x='164' y='172' width='4' height='4'/%3E%3Crect x='52' y='20' width='4' height='4'/%3E%3C/g%3E%3Cg fill='%23b9aed0' fill-opacity='.55'%3E%3Crect x='140' y='40' width='4' height='4'/%3E%3Crect x='24' y='152' width='4' height='4'/%3E%3C/g%3E%3C/svg%3E"),
-    repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.22) 0 2px, transparent 2px 4px),
     linear-gradient(45deg, var(--bg-check) 25%, transparent 25%, transparent 75%, var(--bg-check) 75%),
     linear-gradient(45deg, var(--bg-check) 25%, transparent 25%, transparent 75%, var(--bg-check) 75%);
-  background-size: 128px 128px, 196px 196px, auto, 16px 16px, 16px 16px;
-  background-position: 0 0, 60px 92px, 0 0, 0 0, 8px 8px;
-  background-attachment: fixed, fixed, scroll, scroll, scroll;
+  background-size: 128px 128px, 196px 196px, 16px 16px, 16px 16px;
+  background-position: 0 0, 60px 92px, 0 0, 8px 8px;
+  background-attachment: fixed, fixed, scroll, scroll;
 }
 
-h1, h2, h3, .font-display { font-family: var(--font-pixelify), sans-serif; font-weight: 700; margin: 0; line-height: 1.2; }
+h1, h2, h3, .font-display { font-family: var(--font-jersey), sans-serif; font-weight: 400; margin: 0; line-height: 1; letter-spacing: 0.01em; }
 
 .vn {
   font-family: var(--font-dotgothic), sans-serif;
@@ -86,6 +85,7 @@ h1, h2, h3, .font-display { font-family: var(--font-pixelify), sans-serif; font-
 }
 
 .console {
+  overflow-wrap: anywhere; /* long identifiers (test names, paths) wrap instead of poking out of narrow cards */
   color: var(--c-text);
   font-family: var(--font-plex), system-ui, sans-serif;
   font-size: 15px;
@@ -139,18 +139,18 @@ canvas.pixelated { image-rendering: pixelated; image-rendering: crisp-edges; dis
 
 .px-inset {
   background: var(--inset);
-  border: var(--px) solid var(--edge);
+  border: 2px solid var(--edge);
 }
 
 .px-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-family: var(--font-pixelify), sans-serif;
-  font-weight: 700;
-  font-size: 16px;
+  font-family: var(--font-jersey), sans-serif;
+  font-weight: 400;
+  font-size: 20px;
   line-height: 1;
-  padding: 12px 16px;
+  padding: 10px 14px;
   color: var(--on-accent);
   background: var(--gold);
   border: var(--px) solid var(--shadow);
@@ -163,7 +163,7 @@ canvas.pixelated { image-rendering: pixelated; image-rendering: crisp-edges; dis
 .px-btn:active, .px-btn[aria-pressed="true"] { transform: translateY(var(--px)); box-shadow: 0 0 0 0 #7a5a14; }
 .px-btn.ghost { background: var(--inset); color: var(--text); border-color: var(--edge); box-shadow: 0 var(--px) 0 0 var(--shadow); }
 .px-btn.red { background: var(--red); box-shadow: 0 var(--px) 0 0 #5a1426; }
-.px-btn.sm { font-size: 13px; padding: 8px 10px; gap: 6px; }
+.px-btn.sm { padding: 6px 10px; gap: 6px; }
 .px-btn:disabled { opacity: 0.45; cursor: not-allowed; filter: none; transform: none; }
 
 /* Data tables inside a .px-box: pixel rules between rows, plain readable cells. */
@@ -177,12 +177,12 @@ table.px-table { width: 100%; border-collapse: collapse; font-size: 14px; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--font-pixelify), sans-serif;
-  font-weight: 700;
-  font-size: 12px;
+  font-family: var(--font-jersey), sans-serif;
+  font-weight: 400;
+  font-size: 20px;
   line-height: 1;
-  padding: 6px 8px;
-  border: var(--px) solid var(--shadow);
+  padding: 3px 8px 4px;
+  border: 2px solid var(--shadow);
   white-space: nowrap;
 }
 
@@ -191,9 +191,9 @@ table.px-table { width: 100%; border-collapse: collapse; font-size: 14px; }
   position: absolute;
   left: 50%;
   top: 32%;
-  font-family: var(--font-pixelify), sans-serif;
-  font-weight: 700;
-  font-size: clamp(28px, 6vw, 64px);
+  font-family: var(--font-jersey), sans-serif;
+  font-weight: 400;
+  font-size: 40px;
   line-height: 1;
   padding: 0.6em 1.1em;
   color: #ffffff;
@@ -202,6 +202,7 @@ table.px-table { width: 100%; border-collapse: collapse; font-size: 14px; }
   transform: translate(-50%, -50%) rotate(-6deg) scale(0);
   clip-path: polygon(0% 18%, 12% 0%, 22% 14%, 36% 2%, 46% 16%, 60% 0%, 70% 15%, 84% 1%, 90% 20%, 100% 30%, 92% 48%, 100% 66%, 88% 78%, 94% 100%, 76% 88%, 62% 100%, 50% 86%, 36% 100%, 26% 86%, 10% 98%, 12% 78%, 0% 70%, 8% 50%, 0% 34%);
 }
+@media (min-width: 1024px) { .burst { font-size: 80px; } }
 .burst.show { animation: burst-in 0.24s steps(4) forwards; }
 .burst.red { background: var(--red); }
 .burst.blue { background: #2f8fe0; }

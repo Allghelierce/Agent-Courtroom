@@ -13,11 +13,11 @@ const NAV = [
 export function SiteHeader() {
   const path = usePathname();
   return (
-    <header className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center justify-between gap-4 px-4 py-6">
+    <header className="mx-auto flex w-full max-w-[1064px] flex-wrap items-center justify-between gap-4 px-4 py-6">
       <Link href="/" className="flex items-center gap-3 no-underline">
         <Chibi who="judge" mood="happy" scale={2} />
         <span className="flex flex-col gap-2">
-          <span className="font-display text-[28px] leading-none" style={{ color: "var(--gold)", textShadow: "4px 4px 0 #7a2348" }}>
+          <span className="font-display text-[40px] leading-none" style={{ color: "var(--gold)", textShadow: "4px 4px 0 #7a2348" }}>
             Agent Courtroom
           </span>
           <span className="text-sm leading-none text-soft">Runtime oversight for autonomous agents</span>

@@ -164,6 +164,7 @@ canvas.pixelated { image-rendering: pixelated; image-rendering: crisp-edges; dis
 .px-btn.ghost { background: var(--inset); color: var(--text); border-color: var(--edge); box-shadow: 0 var(--px) 0 0 var(--shadow); }
 .px-btn.red { background: var(--red); box-shadow: 0 var(--px) 0 0 #5a1426; }
 .px-btn.sm { font-size: 13px; padding: 8px 10px; gap: 6px; }
+.px-btn:disabled { opacity: 0.45; cursor: not-allowed; filter: none; transform: none; }
 
 /* Data tables inside a .px-box: pixel rules between rows, plain readable cells. */
 table.px-table { width: 100%; border-collapse: collapse; font-size: 14px; }

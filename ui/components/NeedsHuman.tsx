@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { ENGINE_URL, type Ruling, type Verdict } from "@/lib/data";
 import { useLive, type LiveWorker } from "@/lib/live";
+import { PixelIcon } from "./Pieces";
+import { Chibi } from "./Sprites";
 
 export function NeedsHuman() {
   const live = useLive();
@@ -56,17 +58,29 @@ function Decision({ worker: w, canSend }: { worker: LiveWorker; canSend: boolean
   }
 
   return (
-    <section className="card flex flex-col gap-3 p-4" style={{ borderColor: "var(--amber)", borderLeftWidth: 4 }} aria-labelledby={`human-${id}`}>
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="chip" style={{ "--chip": "var(--amber)" } as React.CSSProperties}>Needs a human</span>
-        <h2 id={`human-${id}`} className="text-[15px]">{id} is paused until you decide</h2>
+    <section className="px-box flex flex-col gap-4 p-4" style={{ borderColor: "var(--amber)" }} aria-labelledby={`human-${id}`}>
+      <div className="flex flex-wrap items-center gap-4">
+        <span className="px-inset shrink-0 p-1">
+          <Chibi who="worker" mood="worried" scale={2} />
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="px-tag pulse-step self-start" style={{ background: "var(--amber)", color: "var(--on-accent)" }}>
+            Needs a human
+          </span>
+          <h2 id={`human-${id}`} className="text-[20px]">
+            {id} is paused until you decide
+          </h2>
+          {last?.verdict.reasoning && <p className="m-0 text-sm text-soft">The court: {last.verdict.reasoning}</p>}
+        </div>
         {caseId && (
-          <Link href={`/court/${caseId}?view=record`} className="btn ml-auto">Open the case</Link>
+          <Link href={`/court/${caseId}?view=record`} className="px-btn sm ghost">
+            <PixelIcon name="scroll" />
+            Read the record
+          </Link>
         )}
       </div>
-      {last?.verdict.reasoning && <p className="m-0 text-[13px] text-c-soft">The court: {last.verdict.reasoning}</p>}
 
-      <label className="flex flex-col gap-1 text-[13px]" htmlFor={`instr-${id}`}>
+      <label className="flex flex-col gap-2 text-sm" htmlFor={`instr-${id}`}>
         New plan for the worker (only for &ldquo;Give it a new plan&rdquo;)
         <textarea
           id={`instr-${id}`}
@@ -74,25 +88,24 @@ function Decision({ worker: w, canSend }: { worker: LiveWorker; canSend: boolean
           value={instruction}
           onChange={(e) => setInstruction(e.target.value)}
           placeholder="For example: mock payments.charge in that one test, flag it for review, and finish the rest."
-          className="rounded-md border p-2"
-          style={{ background: "var(--c-bg)", borderColor: "var(--c-line)", color: "var(--c-text)" }}
+          className="px-inset resize-y p-3 text-[15px] text-text placeholder:text-soft"
           disabled={busy}
         />
       </label>
 
-      <div className="flex flex-wrap gap-2">
-        <button type="button" className="btn primary" disabled={!canSend || busy || !instruction.trim()} onClick={() => decide("change_strategy")}>
+      <div className="flex flex-wrap gap-3">
+        <button type="button" className="px-btn" disabled={!canSend || busy || !instruction.trim()} onClick={() => decide("change_strategy")}>
           Give it a new plan
         </button>
-        <button type="button" className="btn" disabled={!canSend || busy} onClick={() => decide("continue")}>
+        <button type="button" className="px-btn ghost" disabled={!canSend || busy} onClick={() => decide("continue")}>
           Let it continue
         </button>
-        <button type="button" className="btn danger" disabled={!canSend || busy} onClick={() => decide("halt")}>
+        <button type="button" className="px-btn red" disabled={!canSend || busy} onClick={() => decide("halt")}>
           Stop it
         </button>
       </div>
 
-      <p className="m-0 text-[13px]" aria-live="polite" style={{ color: send.state === "error" ? "var(--red)" : "var(--c-soft)" }}>
+      <p className="m-0 text-sm" aria-live="polite" style={{ color: send.state === "error" ? "#ff8a9a" : "var(--soft)" }}>
         {!canSend ? "Decisions go to a live engine. This is a replay or the engine is disconnected." : send.message ?? ""}
       </p>
     </section>

@@ -12,6 +12,7 @@ Read this before you touch anything visual, so the dashboard, the courtroom and 
 - **One plain view.** Each case also has a **Record** tab: the same case as an audit (charge, ruling, instruction sent, outcome, arguments, the evidence table, the verdict JSON). It lives inside `.console` and uses flat hairline `.card`s, `.btn`s, `.chip`s and `table.data`, for anyone checking the work. It's the only place without pixel chrome.
 - **Role colours are shared.** Gold, red, blue, green and amber mean the same thing everywhere, so a ruling chip in the Record matches the stamp in the courtroom.
 - Charges decided without a trial (summary judgment: repeat offender, court over budget) get a short ruling card instead of the full courtroom.
+- When the court escalates, a **Needs a human** panel (`components/NeedsHuman.tsx`) tops the dashboard: the worker's chibi, the court's reasoning and three decisions (new plan, continue, stop). Amber is its colour. It only sends to a live engine; in a replay its buttons are disabled.
 
 ## North star
 

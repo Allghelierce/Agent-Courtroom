@@ -248,7 +248,7 @@ function Impact() {
       <Figure
         label="Cost of oversight"
         value={usd(courtSpend)}
-        detail={`Monitors checked ${steps} steps for free.${mock ? " The court ran in mock mode." : " Only trials call a model."}`}
+        detail={`Monitors checked ${steps} step${steps === 1 ? "" : "s"} for free.${mock ? " The court ran in mock mode." : " Only trials call a model."}`}
       />
       <Figure label="Workers" value={String(workers.length)} detail={states.map(([s, n]) => `${n} ${STATE_LABEL[s].toLowerCase()}`).join(" · ") || "None yet."} />
     </section>

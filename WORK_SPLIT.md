@@ -1,140 +1,169 @@
 # Work Split: Agent Courtroom
 
-How the Agent Courtroom build is divided between three people. The full project plan lives in `CLAUDE.md` on the `Tristan` branch.
+## The idea in one paragraph
 
-**Recap:** a worker agent tries to fix a failing repo. Cheap code monitors watch every step for looping, overspending, stalling, and flailing. When one fires, a court (Prosecutor, Defense, Judge) argues from the logs and rules: continue, change strategy, escalate to a human, or halt.
+We're building a babysitter for AI agents. An AI coding agent (the **worker**) tries to fix a broken project. Simple checks watch it work. If it gets stuck going in circles, a mini "court" of three AIs reviews what happened and decides what the worker should do next. A website shows all of this live, and we prove it saves money by running the same task with and without the court.
 
-The split follows the data. **Person A produces events. Person B judges them and shows them. Person C carries them between A and B, scales the system up, and proves it works.**
+## Words we use
 
----
+| Word | What it means |
+|---|---|
+| **Worker** | The AI agent doing the coding task. |
+| **Trap** | A test we made impossible on purpose, so the worker gets stuck. This is how we show the court working. |
+| **Event** | One line in a log describing one thing the worker did, e.g. "ran the tests, 7 of 10 passed, cost $0.002". |
+| **Check** | Plain code (no AI) that reads the log and raises a flag when something looks wrong. |
+| **Charge** | The flag a check raises, e.g. "the worker ran the same command 3 times in the last 10 steps". |
+| **Court** | Three AI prompts: the **Prosecutor** says the worker is stuck, the **Defense** says it's doing fine, and the **Judge** decides. |
+| **Verdict** | The Judge's decision: keep going, try something different, ask a human, or stop. |
+| **Fake** | A pretend version of someone else's part, so you can build yours before theirs is ready. |
 
-## Person A: Engine (worker, monitors, seed repo)
+## Who does what
 
-### Owns
-1. **Seed repo.** A small project with a failing test suite, including the **trap test**: one test that depends on an unreachable API (or is impossible as written), so the worker loops on it.
-2. **Worker runner.** A tool loop (read file, edit file, run tests) on a sandboxed copy of the seed repo. Every step appends one **Event** to the shared log.
-3. **Monitors.** Plain functions with no LLM calls. They read the event log after every step and return either nothing or a **Charge**:
-   - **Looping (MVP):** the same (tool, args) hash appears 3+ times in the last 10 steps.
-   - **Stalling (MVP):** the passing-test count hasn't gone up in N steps.
-   - **Overspending (stretch):** cost per newly passing test is above a threshold, or the run is over X% of budget.
-   - **Flailing (stretch):** K errors in a row, or the same error message repeated.
-4. **Control hooks.** Pause the worker when a charge is filed, call `convene(packet)`, then act on the verdict:
-   - `continue`: resume.
-   - `change_strategy`: inject `instruction` into the worker's next prompt.
-   - `escalate`: wait for a human.
-   - `halt`: end the run and write a summary.
-5. **Event publishing.** Send every event, charge, and verdict to Person C's event server.
-6. **Run toggle.** A flag that runs the worker with the courtroom turned off, which Person C's benchmark harness uses.
-
-### Can work alone by
-Using Person C's stub `convene()`, which always returns a fixed `change_strategy` verdict.
-
-### Done when
-The worker loops on the trap test, the looping monitor fires, the worker pauses, the injected instruction is applied, and the worker gets the rest of the suite passing.
+| | Person A: The Worker | Person B: The Court and Website (Tristan) | Person C: The Glue and Demo |
+|---|---|---|---|
+| **In one line** | Builds the AI that does the coding and the checks that watch it. | Builds the AI court and the website that shows everything. | Connects A and B, runs several workers at once, and gets the demo ready. |
 
 ---
 
-## Person B: Court and UI
+## Person A: The Worker
 
-### Owns
-1. **Evidence packet builder.** Turns a Charge into a packet: the charge, the last N events, the test progress curve, and spend vs. budget.
-2. **Courtroom.** `convene(packet) → Verdict`:
-   - **Prosecutor** (cheap model): argues the worker is stuck or wasting money. Must cite event IDs.
-   - **Defense** (cheap model): argues the worker is making real progress. Must cite event IDs.
-   - **Judge** (stronger model): returns the structured Verdict JSON below.
-   - Arguments use only logs and metrics, never the worker's own story.
-3. **Dashboard.** A live grid of workers showing status, tests passing, a cost meter, and warning lights for each monitor.
-4. **Courtroom scene.** A pixel-art courtroom that plays the trial transcript as dialogue and ends on the verdict. Start from the mockup at https://claude.ai/artifact/YbpiWve6SgVTkYuexMZMpV and switch it from the price watcher to the coding worker.
-5. **Case log page.** Every trial (charge, arguments, verdict, cited events) listed for human audit.
-6. **Comparison view.** Shows Person C's with/without numbers side by side.
+**Your job:** make an AI agent that tries to fix a broken project, and notice when it gets stuck.
 
-### Can work alone by
-Building against Person C's fake event log, which replays a scripted looping run.
+### Tasks (in order)
 
-### Done when
-A real charge produces a full trial with a valid Verdict, and the dashboard and courtroom scene play it live.
+1. **Make the broken project.** Create a tiny project (a few functions) with tests that fail. Make one test impossible to pass, e.g. it calls a website that doesn't exist. That's the trap.
+2. **Build the worker.** Write a loop that asks an AI model what to do next, lets it read files, edit files, and run the tests, and repeats until the tests pass.
+3. **Log every step.** After each action, write one event to the log: what it did, how many tests pass, how much it cost, and any error.
+4. **Write two checks.**
+   - **Looping:** the worker did the exact same action 3 times in its last 10 steps.
+   - **Stuck:** the number of passing tests hasn't gone up in the last 8 steps.
 
----
+   When a check triggers, create a charge.
+5. **Listen to the court.** When there's a charge, pause the worker and send the charge to the court. When the verdict comes back:
+   - **Keep going:** resume.
+   - **Try something different:** add the Judge's advice to the worker's next message.
+   - **Ask a human:** wait.
+   - **Stop:** end the run.
+6. **Add an off switch** so the worker can run without the court. Person C needs this for the comparison.
 
-## Person C: Platform, scale, and demo
+**Before B's court is ready:** use C's fake court, which always says "try something different."
 
-### Owns
-1. **Shared contracts.** Owns `shared/schema.ts` (Event, Charge, Verdict) and keeps it versioned as A and B change things.
-2. **Mock data (day one, first hour).** A fake event log that replays a scripted looping run, for B, and a stub `convene()` that returns a fixed `change_strategy` verdict, for A.
-3. **Event server.** Receives events, charges, and verdicts from A's workers and streams them to B's dashboard over SSE. Stores events, cases, and verdicts so the case log survives a refresh or restart.
-4. **Multi-worker orchestration (scalability).** Runs 3–5 workers at once, each on its own sandboxed repo copy, with one courtroom serving all of them.
-5. **More seed repos.** Extra repos with different traps (impossible test, flaky test, missing dependency) so the parallel demo isn't five copies of the same failure.
-6. **Benchmark harness (real-world impact).** Runs the same tasks with and without the courtroom, using A's run toggle. Records total cost, time to completion, and success rate, and hands the numbers to B's comparison view.
-7. **Cost accounting.** Keeps per-model token prices accurate and tracks the court's own spend, to show that oversight costs only a small fraction of what it saves.
-8. **Demo and pitch.** A demo script that reliably hits the trap, a backup recording of the full flow, slides, the README, and deployment if we want a live URL for judges.
-
-### Can work alone by
-Starting with the schema, mocks, and event server, none of which depend on A or B.
-
-### Done when
-Several workers stream through the event server into the dashboard, the benchmark produces with/without numbers, and the backup demo video is recorded.
+**You're done when:** the worker gets stuck on the trap, a check notices, the court's advice is passed in, and the worker fixes the rest of the tests.
 
 ---
 
-## Shared contracts (agree on these first)
+## Person B: The Court and Website (Tristan)
 
-Person C puts these in `shared/schema.ts` before anyone starts building.
+**Your job:** build the court that decides what a stuck worker should do, and the website that shows everything.
 
-```ts
-type Event = {
-  id: number;
-  workerId: string;
-  step: number;
-  tool: "read_file" | "edit_file" | "run_tests" | string;
-  args: Record<string, unknown>;
-  tokens: number;
-  costUsd: number;
-  testsPassing: number;
-  testsTotal: number;
-  error?: string;
-  timestamp: string;
-};
+### Tasks (in order)
 
-type Charge = {
-  workerId: string;
-  kind: "looping" | "overspending" | "stalling" | "flailing";
-  summary: string;
-  eventIds: number[];
-};
+1. **Gather the evidence.** When a charge comes in, bundle up the charge, the last ~10 events, how the number of passing tests changed over time, and how much money has been spent.
+2. **Write the three court prompts.**
+   - **Prosecutor:** argues the worker is stuck or wasting money.
+   - **Defense:** argues the worker is making real progress.
+   - Both must point to specific event numbers as proof, not just opinions.
+   - **Judge:** reads both sides and returns a verdict in the fixed format at the bottom of this file.
+   - Use a cheap model for the Prosecutor and Defense, and a stronger one for the Judge.
+3. **Build the main page.** One card per worker showing its status, tests passed, money spent, and a warning light for each check.
+4. **Build the courtroom scene.** A pixel-art courtroom that plays the trial like a conversation and ends on the verdict. Start from the mockup: https://claude.ai/artifact/YbpiWve6SgVTkYuexMZMpV
+5. **Build the case history page.** A list of every trial: what the charge was, what each side said, and the verdict.
+6. **Build the comparison chart** using C's numbers (with court vs. without court).
 
-type Verdict = {
-  ruling: "continue" | "change_strategy" | "escalate" | "halt";
-  instruction?: string;
-  reasoning: string;
-  cited_events: number[];
-};
-```
+**Before A's worker is ready:** use C's fake log, which replays a worker getting stuck.
 
-**Interfaces between A, B, and C:**
-- `convene(packet) → Verdict`: B implements it, A calls it. C provides the stub until B's version is ready.
-- The event stream: A publishes to C's event server, and B's UI subscribes to it.
-- Benchmark results: C produces them, and B's comparison view displays them.
+**You're done when:** a real charge leads to a full trial with a proper verdict, and the website shows it live.
 
 ---
 
-## Decide together first (about 30 minutes)
+## Person C: The Glue and Demo
 
-1. **Stack:** proposed Next.js dashboard, with a Node or Python service for the worker and court streaming over SSE.
-2. **Worker:** our own minimal tool loop (easier pausing and logging) or the Claude Agent SDK.
-3. **Schemas:** finalize the types above.
+**Your job:** connect A and B so they can work in parallel, scale it up to several workers, and prove it saves money.
 
-## Integration checkpoints
+### Tasks (in order)
 
-0. **Hour one:** C ships the schema, mocks, and a bare event server.
-1. **First:** A's real events flow through C's server and replace B's fake log.
-2. **Second:** B's real `convene()` replaces the stub, and the full loop runs on the trap repo.
-3. **Third:** C runs several workers in parallel and produces the benchmark numbers.
-4. **Last:** demo script, backup recording, and polish.
+1. **First hour: write the shared data formats** (at the bottom of this file) into `shared/schema.ts`, so everyone uses the same field names.
+2. **First hour: make the two fakes.**
+   - A **fake log** for B that replays a worker getting stuck.
+   - A **fake court** for A that always says "try something different."
+3. **Build the middle server.** It receives events from A's worker and pushes them live to B's website. It saves everything, so nothing is lost if the page reloads.
+4. **Run several workers at once** (3 to 5), each on its own copy of a broken project.
+5. **Make 2 or 3 more broken projects** with different traps (e.g. a test that randomly fails, or a missing library), so the workers don't all get stuck the same way.
+6. **Run the comparison.** Run the same task with the court on and off. Record total cost, time, and whether it finished, and give the numbers to B.
+7. **Track costs,** including how much the court itself costs, so we can show it's cheap compared to what it saves.
+8. **Prepare the demo:** a step-by-step demo script, a backup video in case the live demo breaks, slides, and the README.
 
-## Stretch (after MVP works)
+**You're done when:** several workers show up live on the website, the comparison numbers are ready, and the backup video is recorded.
+
+---
+
+## Order of work
+
+1. **Everyone together (30 min):** pick the tech (suggested: a Next.js website, plus Node or Python for the worker and court) and agree on the data formats below.
+2. **C (first hour):** shared data formats, both fakes, and a basic server. A and B start building against the fakes.
+3. **Connect A to B:** the real worker's events show up on the website.
+4. **Connect the court:** B's real court replaces the fake one, and a full run works on the trap.
+5. **Scale up:** C runs multiple workers and the comparison.
+6. **Everyone:** practice the demo, record the backup video, and polish.
+
+## Must-have vs. nice-to-have
+
+**Must-have for the demo:** one worker, the looping and stuck checks, one full trial, the worker recovering after the verdict, the website showing it, and the comparison numbers.
+
+**Nice-to-have (only after the must-haves work):**
 
 | Person A | Person B | Person C |
 |---|---|---|
-| Overspending and flailing monitors | Human-escalation button in the UI | Scale past 5 workers |
-| A second worker type | Appeals (the worker contests a ruling once) | Live deployment for judges |
-| | "Precedent": past verdicts fed to the Judge | Store precedent for the Judge |
+| Two more checks: overspending and repeated errors | A "human decides" button on the website | More than 5 workers at once |
+| A second kind of worker (not coding) | The worker can appeal a verdict once | A live website judges can visit |
+| | The Judge sees past verdicts for similar cases | Save past verdicts for the Judge |
+
+---
+
+## Shared data formats (reference)
+
+These are the three things passed between people. Use these exact field names.
+
+**Event:** one thing the worker did (A creates it, B displays it).
+
+```json
+{
+  "id": 42,
+  "workerId": "worker-1",
+  "step": 42,
+  "tool": "run_tests",
+  "args": {},
+  "tokens": 850,
+  "costUsd": 0.002,
+  "testsPassing": 7,
+  "testsTotal": 10,
+  "error": null,
+  "timestamp": "2026-10-24T21:30:00Z"
+}
+```
+
+**Charge:** the flag a check raises (A creates it, B's court receives it).
+
+```json
+{
+  "workerId": "worker-1",
+  "kind": "looping",
+  "summary": "Ran the same test command 3 times in the last 10 steps",
+  "eventIds": [38, 40, 42]
+}
+```
+
+`kind` is one of `looping`, `stalling`, `overspending`, or `flailing`. The must-haves only use `looping` and `stalling` ("stuck").
+
+**Verdict:** the Judge's decision (B creates it, A's worker follows it).
+
+```json
+{
+  "ruling": "change_strategy",
+  "instruction": "Mock the payments API in test_checkout and move on",
+  "reasoning": "Events 38, 40, and 42 show the same failing call with no progress.",
+  "cited_events": [38, 40, 42]
+}
+```
+
+`ruling` is one of `continue` (keep going), `change_strategy` (try something different), `escalate` (ask a human), or `halt` (stop).

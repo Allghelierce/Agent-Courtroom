@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import type Anthropic from "@anthropic-ai/sdk";
 import Groq from "groq-sdk";
@@ -208,4 +209,51 @@ test("anthropic transport error: costComplete false", async () => {
   assert.equal(trial.prosecution.costComplete, false);
   assert.equal(trial.costComplete, false);
   close(trial.costUsd, usd(JUDGE_MODEL, 1000, 200));
+});
+
+// ---- missing price list (COURT_PRICES_PATH) ----
+
+// PRICES loads when court.ts is imported, so each case runs court.ts in a fresh child process.
+// The child holds one real-path trial on a fake Anthropic client and prints what it saw.
+const CHILD = `
+const { costOf, holdTrial } = await import(process.env.COURT_MODULE);
+const { readFileSync } = await import("node:fs");
+const packet = JSON.parse(readFileSync(0, "utf8"));
+const reply = (model, out) => async () => ({ model, stop_reason: "end_turn", usage: { input_tokens: 1000, output_tokens: 200 }, parsed_output: out });
+const client = {
+  messages: { parse: reply("claude-haiku-5-5", { argument: "It loops.", cited_events: [], recommended_ruling: "change_strategy" }) },
+  beta: { messages: { parse: reply("claude-opus-5-5", { ruling: "change_strategy", instruction: "Mock the API.", reasoning: "Stuck.", cited_events: [] }) } },
+};
+const trial = await holdTrial(packet, { mock: false, client });
+console.log(JSON.stringify({ cost: costOf("claude-opus-5-5", { input_tokens: 1000, output_tokens: 200 }), trial }));
+`;
+
+function courtWithPrices(pricesPath: string | undefined) {
+  const env: NodeJS.ProcessEnv = { ...process.env, COURT_MODULE: new URL("../src/court.ts", import.meta.url).href };
+  delete env.COURT_PRICES_PATH;
+  if (pricesPath !== undefined) env.COURT_PRICES_PATH = pricesPath;
+  const res = spawnSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", CHILD], { env, input: JSON.stringify(packet), encoding: "utf8" });
+  assert.equal(res.status, 0, `child failed: ${res.stderr}`);
+  return { ...(JSON.parse(res.stdout.trim().split("\n").at(-1)!) as { cost: number | null; trial: { costUsd: number; costComplete: boolean; pricingDate: string; verdict: { ruling: string } } }), stderr: res.stderr };
+}
+
+test("missing price list: court.ts still loads, costOf is null, a real-path trial is costComplete false", () => {
+  const { cost, trial, stderr } = courtWithPrices("/nonexistent/model-prices.json");
+  assert.equal(cost, null);
+  assert.equal(trial.costComplete, false);
+  assert.equal(trial.costUsd, 0);
+  assert.equal(trial.pricingDate, "unknown");
+  assert.equal(trial.verdict.ruling, "change_strategy", "the trial itself still runs");
+  assert.match(stderr, /no price list at \/nonexistent\/model-prices\.json/);
+});
+
+test("COURT_PRICES_PATH pointing at a real price list prices the trial (control for the test above)", () => {
+  const shared = new URL("../../shared/model-prices.json", import.meta.url).pathname;
+  for (const path of [undefined, shared]) {
+    const { cost, trial, stderr } = courtWithPrices(path);
+    close(cost!, usd("claude-opus-5-5", 1000, 200));
+    assert.equal(trial.costComplete, true);
+    assert.equal(trial.pricingDate, PRICES.verifiedAt);
+    assert.doesNotMatch(stderr, /no price list/);
+  }
 });

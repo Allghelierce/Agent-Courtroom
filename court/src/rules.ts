@@ -18,8 +18,10 @@ export type RulesConfig = {
 
 export function rulesConfig(env: NodeJS.ProcessEnv = process.env): RulesConfig {
   const num = (name: string, fallback: number) => {
-    const v = Number(env[name]);
-    return env[name] !== undefined && Number.isFinite(v) && v >= 0 ? v : fallback;
+    const raw = env[name]?.trim();
+    const v = Number(raw);
+    // Blank counts as unset: Number("") is 0, and a blank line in a .env file must not mean "no trials".
+    return raw && Number.isFinite(v) && v >= 0 ? v : fallback;
   };
   return {
     enabled: env.COURT_RULES !== "off",
@@ -55,7 +57,8 @@ export function summaryJudgment(packet: EvidencePacket, past: Trial[], cfg: Rule
 
   // Repeat offender. A "continue" ruling, or a quiet spell longer than the window, resets it.
   if (last && minutesAgo <= cfg.repeatWindowMin) {
-    const ago = minutesAgo < 1 ? "under a minute" : `${Math.round(minutesAgo)} minutes`;
+    const mins = Math.round(minutesAgo);
+    const ago = minutesAgo < 1 ? "under a minute" : mins === 1 ? "1 minute" : `${mins} minutes`;
     if (last.summary === "repeat_offender" && last.verdict.ruling === "escalate") {
       return {
         kind: "repeat_offender",
@@ -89,7 +92,8 @@ export function summaryJudgment(packet: EvidencePacket, past: Trial[], cfg: Rule
   const spent = full.reduce((s, t) => s + t.costUsd, 0);
   const cap = Math.max(cfg.budgetFloorUsd, cfg.budgetFraction * packet.spend.usd);
   const lastHour = full.filter((t) => now - Date.parse(t.finishedAt) < HOUR_MS);
-  const overSpend = spent >= cap;
+  // Nothing spent yet never blocks a trial, even with a $0 cap.
+  const overSpend = spent > 0 && spent >= cap;
   const overCount = lastHour.length >= cfg.maxTrialsPerHour;
   if (overSpend || overCount) {
     const why = overSpend

@@ -29,6 +29,7 @@ The court picks a provider automatically: **Anthropic** if `ANTHROPIC_API_KEY` i
 | `COURT_PROVIDER` | auto | `anthropic` or `groq` forces a provider. |
 | `COURT_MOCK` | unset | `1` forces the mock even with a key set. |
 | `COURT_LAWYER_MODEL` / `COURT_JUDGE_MODEL` | per provider | Override the models. |
+| `COURT_PRICES_PATH` | `../shared/model-prices.json` | Price list for cost accounting. Missing file: the court still runs and marks costs incomplete. |
 | `COURT_DEADLINE_MS` | `50000` | Time limit for a whole trial. The engine's `HttpCourt` times out at 60s. A lawyer who runs out of time rests, and a Judge who can't rule gives `escalate`. |
 | `COURT_PORT` | `4100` | HTTP port. |
 | `COURT_HOST` | `127.0.0.1` | Interface to bind. Use `0.0.0.0` to accept other machines. |

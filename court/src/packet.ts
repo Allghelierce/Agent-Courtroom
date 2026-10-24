@@ -19,9 +19,11 @@ export function fromEnginePacket(p: EnginePacket, opts: { window?: number } = {}
   });
 }
 
-// Stable key for "the same call": tool plus args with sorted keys.
+// Stable key for "the same call": tool, args with sorted keys, and the outcome.
+// Matches the engine's looping monitor: rerunning tests is normal, rerunning them
+// and getting the same failure is not.
 export function callKey(e: Event): string {
-  return `${e.tool}:${stableStringify(e.args)}`;
+  return `${e.tool}:${stableStringify(e.args)}:${e.result ?? ""}:${e.error ?? ""}`;
 }
 
 function stableStringify(v: unknown): string {

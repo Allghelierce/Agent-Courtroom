@@ -13,7 +13,7 @@ from .bus import Bus
 from .court import Court, build_packet
 from .schema import Charge, Event, Verdict, WorkerStatus
 from .tasks import Env, Task, ToolOutcome
-from .costs import PRICES
+from .costs import PRICES, pricing_info
 
 HUMAN_WAIT_SECONDS = 600
 
@@ -143,7 +143,8 @@ class Worker:
             self.status.workerCostComplete &= action.cost_complete
             self.bus.publish("usage", {"workerId": self.id, "model": action.model, "usage": action.usage,
                                        "costUsd": action.cost_usd if action.cost_complete else None,
-                                       "mode": self.status.costMode, "pricingDate": PRICES["verifiedAt"]})
+                                       "mode": self.status.costMode,
+                                       "pricingDate": pricing_info(action.model)["verifiedAt"] or PRICES["verifiedAt"]})
 
             if action.tool is None:
                 self.status.testsPassing, self.status.testsTotal = env.baseline()

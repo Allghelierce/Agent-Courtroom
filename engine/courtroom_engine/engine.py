@@ -16,7 +16,7 @@ from .bus import Bus
 from .court import HttpCourt, StubCourt
 from .tasks import TASKS, Task
 from .worker import Worker
-from .costs import PRICES
+from .costs import PRICES, model_provider, pricing_info
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -39,6 +39,8 @@ class RunConfig:
         get_task(self.task)
         if not isinstance(self.brain, str) or self.brain not in DEFAULT_MODELS:
             raise ValueError("brain must be scripted, claude, or groq")
+        if self.model is not None and self.brain != "scripted" and model_provider(self.model) != self.brain:
+            raise ValueError(f"model {self.model} is not a priced {self.brain} model; see shared/model-prices.json")
         if isinstance(self.budget_usd, bool) or not isinstance(self.budget_usd, (int, float)) or not math.isfinite(self.budget_usd) or self.budget_usd <= 0:
             raise ValueError("budgetUsd must be a positive finite number")
         if type(self.max_steps) is not int or not 1 <= self.max_steps <= 10000:
@@ -159,19 +161,22 @@ class Engine:
         without_court = self.create_worker(cfg, court="none", label="no-court")
         for worker in (with_court, without_court):
             worker.run()
+        model = cfg.model or DEFAULT_MODELS[cfg.brain]
         result = {
             "id": f"comparison-{uuid.uuid4().hex}",
             "createdAt": datetime.now(timezone.utc).isoformat(),
             "task": cfg.task,
             "brain": cfg.brain,
-            "model": cfg.model or DEFAULT_MODELS[cfg.brain],
+            "model": model,
             "court": cfg.court,
             "budgetUsd": cfg.budget_usd,
             "maxSteps": cfg.max_steps,
             "costMode": "simulated" if cfg.brain == "scripted" else "estimated_from_usage",
-            "pricingDate": PRICES["verifiedAt"],
-            "pricingSource": PRICES["source"],
-            "workerPricingSource": PRICES["groqSource"] if cfg.brain == "groq" else PRICES["source"],
+            # The court always prices with Claude rates; the worker's come from its own model's provider.
+            "pricingDate": PRICES["providers"]["claude"]["verifiedAt"],
+            "pricingSource": PRICES["providers"]["claude"]["source"],
+            "workerPricingDate": pricing_info(model)["verifiedAt"],
+            "workerPricingSource": pricing_info(model)["source"],
             "successCriteria": "pending human definition; state is engine-reported test completion only",
             "withCourt": with_court.result(),
             "withoutCourt": without_court.result(),

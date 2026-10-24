@@ -45,6 +45,15 @@ def main():
         key = "GROQ_API_KEY" if args.brain == "groq" else "ANTHROPIC_API_KEY"
         if not args.success_criteria or not os.environ.get(key):
             parser.error(f"Real comparisons require --success-criteria and {key}")
+        if not args.court.startswith(("http://", "https://")):
+            parser.error("Real comparisons need the HTTP court; the stub court's $0 cost isn't a real overhead")
+    configs = {task: RunConfig(task=task, brain=args.brain, model=args.model, court=args.court,
+                               budget_usd=args.budget, max_steps=args.max_steps) for task in args.tasks}
+    try:
+        for cfg in configs.values():
+            cfg.validate()
+    except ValueError as e:
+        parser.error(str(e))
     out = args.output or ROOT / "runs/benchmarks" / datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
     out.mkdir(parents=True, exist_ok=False)
     bus = Bus(record_path=out / "events.jsonl", db_path=out / "events.sqlite")
@@ -58,7 +67,7 @@ def main():
         engine = Engine(bus)
         for task in args.tasks:
             for repetition in range(args.repetitions):
-                result = engine.compare(RunConfig(task=task, brain=args.brain, model=args.model, court=args.court, budget_usd=args.budget, max_steps=args.max_steps))
+                result = engine.compare(configs[task])
                 result.update(repetition=repetition + 1, revision=revision, dirtyWorkingTree=dirty,
                               seedDigest=seed_digest(ROOT / "seed_repos" / ("checkout" if task == "coding" else "price_watch")))
                 if args.success_criteria:
@@ -66,6 +75,11 @@ def main():
                 results.append(result)
                 (out / "runs.json").write_text(json.dumps(results, indent=2) + "\n")
                 print(f"{task} pair {repetition + 1}: {result['withCourt']['state']} / {result['withoutCourt']['state']} ({result['costMode']})", flush=True)
+                # The court quietly runs its $0 mock without an Anthropic key; that would fake the savings.
+                fake = set(result["withCourt"]["courtModes"]) & {"mock", "stub"}
+                if args.brain != "scripted" and fake:
+                    sys.exit(f"Court ran in {'/'.join(sorted(fake))} mode, so its cost isn't real. Restart it with "
+                             f"ANTHROPIC_API_KEY set and COURT_MOCK unset. Partial results: {out}")
     finally:
         bus.close()
     rows = []
@@ -78,6 +92,7 @@ def main():
                          "verifiedSuccessRate": None,
                          "medianCostUsd": statistics.median(costs) if len(costs) == len(runs) else None,
                          "medianElapsedSeconds": statistics.median(r["seconds"] for r in runs),
+                         "courtModes": "/".join(sorted({m for r in runs for m in r["courtModes"]})),
                          "costMode": "simulated" if args.brain == "scripted" else "estimated_from_usage"})
     summary = {"pairs": len(results), "rows": rows, "limitation": "Engine completion is not independently verified task success. Scripted comparisons measure the script, not model quality. Court-enabled prompts can override task restrictions."}
     (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")

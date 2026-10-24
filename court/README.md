@@ -10,11 +10,44 @@ const verdict = await convene(packet);   // contract for Person A: Verdict only
 const trial = await holdTrial(packet);   // full record for the UI and case log
 ```
 
-- **Prosecutor and Defense:** `claude-haiku-5-5`, run in parallel. Each must cite event IDs; IDs not in the packet are dropped.
-- **Judge:** `claude-opus-5-5`, returns the Verdict JSON from WORK_SPLIT.md. Server-side refusal fallbacks are on (`fallbacks: "default"`).
+- **Prosecutor and Defense** run in parallel. Each must cite event IDs. IDs not in the packet are dropped.
+- **Judge** returns the Verdict JSON from WORK_SPLIT.md.
 - **Safety defaults:** if the Judge errors or refuses, the ruling is `escalate`. A `change_strategy` with no instruction also becomes `escalate`.
-- **Mock mode:** with no `ANTHROPIC_API_KEY` set (or `COURT_MOCK=1`), the court runs a deterministic mock and calls no model. `trial.mock` says which ran.
-- Override models with `COURT_LAWYER_MODEL` / `COURT_JUDGE_MODEL`.
+- **Works for any task:** the court reasons over `testsPassing` / `testsTotal`, which the engine fills with tests passing (`coding` task) or products resolved (`prices` task).
+
+## Providers and environment
+
+The court picks a provider automatically: **Anthropic** if `ANTHROPIC_API_KEY` is set, otherwise **Groq** if `GROQ_API_KEY` is set, otherwise the **mock** (deterministic, no model calls). `trial.mock` and `trial.judgeModel` say which ran.
+
+| Provider | Lawyers | Judge | Notes |
+|---|---|---|---|
+| Anthropic | `claude-haiku-5-5` | `claude-opus-5-5` | Server-side refusal fallbacks on (`fallbacks: "default"`). |
+| Groq | `openai/gpt-oss-20b` | `openai/gpt-oss-120b` | JSON-schema output, checked against the same Zod schemas. The free tier rate-limits, and the SDK retries within the deadline. |
+
+| Env var | Default | What it does |
+|---|---|---|
+| `COURT_PROVIDER` | auto | `anthropic` or `groq` forces a provider. |
+| `COURT_MOCK` | unset | `1` forces the mock even with a key set. |
+| `COURT_LAWYER_MODEL` / `COURT_JUDGE_MODEL` | per provider | Override the models. |
+| `COURT_DEADLINE_MS` | `50000` | Time limit for a whole trial. The engine's `HttpCourt` times out at 60s. A lawyer who runs out of time rests, and a Judge who can't rule gives `escalate`. |
+| `COURT_PORT` | `4100` | HTTP port. |
+| `COURT_HOST` | `127.0.0.1` | Interface to bind. Use `0.0.0.0` to accept other machines. |
+| `COURT_CASES_DIR` | `court/cases/` | Where trials are saved and precedent is read from. |
+
+**Cost:** prices come from `shared/model-prices.json` (USD per million tokens, shared with the engine). Each trial records `costUsd`, `costComplete` (false if a model had no listed price), and `pricingDate`. The engine fetches the trial with `GET /cases/<X-Case-Id>` and adds `costUsd` to `WorkerStatus.courtCostUsd`.
+
+## Summary judgment (no trial)
+
+When the court has the worker's earlier trials (the HTTP server always passes the case log), plain code can decide a charge before any model is called. These rulings cost $0, set `trial.summary`, and list the cases they rest on in `trial.priorCaseIds`.
+
+| Rule | When | Ruling |
+|---|---|---|
+| Repeat offender | Charged again within `COURT_REPEAT_WINDOW_MIN` (30) of a `change_strategy` ruling | `escalate`: the new strategy didn't work |
+| Repeat offender | Charged again after that escalation | `halt` |
+| Court budget | Court spend on this worker ≥ max(`COURT_BUDGET_FLOOR_USD` $0.05, `COURT_BUDGET_FRACTION` 5% × worker spend) | `escalate` |
+| Court budget | `COURT_MAX_TRIALS_PER_HOUR` (6) full trials for this worker in the last hour | `escalate` |
+
+A `continue` ruling or a quiet spell longer than the window resets the repeat chain. Worker IDs repeat across engine `run`/`compare` invocations, so only trials that finished after the current run began count: the engine can send `workerStartedAt` in the packet; otherwise the court uses the oldest event it was sent. `COURT_RULES=off` disables all of it.
 
 ## Run
 
@@ -29,7 +62,7 @@ npm run typecheck
 
 ## HTTP
 
-`npm run serve` starts a small server (port `COURT_PORT`, default 4100) so the worker and the UI can reach the court over HTTP. CORS is open. Trials are saved to `court/cases/`.
+`npm run serve` starts a small server on `COURT_HOST:COURT_PORT` (default `127.0.0.1:4100`), so the worker and the UI can reach the court over HTTP. CORS is open. Trials are saved to `COURT_CASES_DIR` (default `court/cases/`). Point the engine at it with `--court http://localhost:4100/verdict`.
 
 ```bash
 curl localhost:4100/health                                  # {"ok":true}
@@ -53,11 +86,11 @@ curl -i -X POST localhost:4100/verdict \
 
 Run with `COURT_MOCK=1` to try it without calling a model.
 
-**Precedent.** `/convene` and `/verdict` both pass the whole case log (`court/cases/`) to `holdTrial` as `past`, so the court learns from its own earlier rulings. A trial's precedent IDs are in `trial.precedents`. Recent trials from the *same* worker are skipped (see `src/precedent.ts`), so a worker's first trial and its retrial two minutes later won't cite each other. A trial from another worker will.
+**Precedent.** `/convene` and `/verdict` both pass the whole case log (`COURT_CASES_DIR`) to `holdTrial` as `past`, so the court learns from its own earlier rulings. A trial's precedent IDs are in `trial.precedents`. Recent trials from the *same* worker are skipped (see `src/precedent.ts`), so a worker's first trial and its retrial two minutes later won't cite each other. A trial from another worker will.
 
 ## Calling the court from the engine (Python)
 
-`clients/python/court_client.py` is a stdlib-only client for `POST /verdict`. Copy it into the engine as-is.
+The engine has its own client, `HttpCourt` in `engine/courtroom_engine/court.py`. `clients/python/court_client.py` is a standalone, standard-library-only client for any other Python caller.
 
 ```python
 from court_client import convene

@@ -2,11 +2,13 @@
 //   npm run eval -- --yes [--save evals/<timestamp>.json]
 // Costs real money, so it prints an estimate and does nothing without --yes.
 // COURT_EVAL_STUB=1 runs the mock court instead, clearly labeled; it exists only for scripts/eval.test.ts.
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { costOf, holdTrial, JUDGE_MODEL, LAWYER_MODEL } from "../src/court.ts";
+import { costOf, holdTrial, modelsFor, resolveProvider } from "../src/court.ts";
+
+const { lawyer: LAWYER_MODEL, judge: JUDGE_MODEL } = modelsFor(resolveProvider() ?? "anthropic");
 import { buildPacket, fromEnginePacket } from "../src/packet.ts";
 import { renderPacket } from "../src/prompts.ts";
 import type { Charge, EnginePacket, Event, EvidencePacket, Ruling, Trial } from "../src/types.ts";
@@ -45,11 +47,11 @@ export function loadCases(): Case[] {
     };
     cases.push({ name: file, packet: buildPacket(run.charge, run.events, { budgetUsd: run.budgetUsd }), expected: expectedRulings(run.verdict) });
   }
-  const checkout = new URL("engine-packet-checkout.json", FIXTURES);
-  if (existsSync(checkout)) {
-    const raw = JSON.parse(readFileSync(checkout, "utf8"));
+  // Engine-shaped fixtures: an EnginePacket itself or { packet, verdict }.
+  for (const file of readdirSync(FIXTURES).filter((f) => /^engine-packet-.*\.json$/.test(f)).sort()) {
+    const raw = JSON.parse(readFileSync(new URL(file, FIXTURES), "utf8"));
     const ep: EnginePacket = raw.packet ?? raw;
-    cases.push({ name: "engine-packet-checkout.json", packet: fromEnginePacket(ep), expected: expectedRulings(raw.verdict) });
+    cases.push({ name: file, packet: fromEnginePacket(ep), expected: expectedRulings(raw.verdict) });
   }
   return cases;
 }
@@ -113,8 +115,8 @@ export function formatTotals(rows: Row[]): string {
 
 async function main(argv: string[]): Promise<number> {
   const stub = process.env.COURT_EVAL_STUB === "1";
-  if (!stub && !process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
-    console.log("eval needs ANTHROPIC_API_KEY set: it runs the real-model court and never falls back to the mock.");
+  if (!stub && resolveProvider() === null) {
+    console.log("eval needs ANTHROPIC_API_KEY (or GROQ_API_KEY) set: it runs the real-model court and never falls back to the mock.");
     return 0;
   }
 

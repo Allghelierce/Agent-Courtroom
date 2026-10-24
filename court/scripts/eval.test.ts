@@ -45,11 +45,12 @@ test("stubbed run prints the labeled table and totals, and --save writes them", 
     assert.match(out, /^fixture\s+expected\s+actual\s+match/m);
     assert.match(out, /looping-run\.json\s+change_strategy\s+change_strategy\s+yes/);
     assert.match(out, /engine-packet-checkout\.json\s+—\s+\S+\s+n\/a/);
-    assert.match(out, /Matches: 4\/4 \(1 fixture with no expected ruling\)/);
+    assert.match(out, /engine-packet-prices\.json\s+change_strategy\s+change_strategy\s+yes/);
+    assert.match(out, /Matches: 5\/5 \(1 fixture with no expected ruling\)/);
     const saved = JSON.parse(readFileSync(file, "utf8"));
     assert.equal(saved.stub, true);
-    assert.equal(saved.rows.length, 5);
-    assert.equal(saved.trials.length, 5);
+    assert.equal(saved.rows.length, 6);
+    assert.equal(saved.trials.length, 6);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

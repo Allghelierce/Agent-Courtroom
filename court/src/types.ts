@@ -44,6 +44,7 @@ export type EnginePacket = {
   testProgress: { step: number; testsPassing: number; testsTotal: number }[];
   spend: { costUsd: number; budgetUsd: number };
   task: string;
+  workerStartedAt?: string; // optional: when this worker's run began (WorkerStatus.startedAt)
 };
 
 // The court's enriched packet, built from an EnginePacket or a raw event log.
@@ -51,6 +52,10 @@ export type EvidencePacket = {
   charge: Charge;
   workerId: string;
   task?: string;
+  // Earliest time this run is known to have been going: the run's start if known, else the
+  // oldest event in the packet. Worker IDs repeat across engine runs, so the summary rules
+  // only count earlier trials that finished after this.
+  runSince?: string;
   events: Event[]; // the last N events for this worker, oldest first
   progress: { step: number; testsPassing: number; testsTotal: number }[];
   spend: { usd: number; budgetUsd: number; fractionOfBudget: number };
@@ -84,6 +89,9 @@ export type Trial = {
   defense: Argument;
   verdict: Verdict;
   precedents?: string[]; // ids of earlier trials shown to the Judge
+  summary?: "repeat_offender" | "court_budget"; // decided by court/src/rules.ts without a trial
+  priorCaseIds?: string[]; // for a summary ruling: the earlier cases it rests on
+  runSince?: string; // the packet's runSince, kept so later trials can tell runs apart
   judgeModel: string;
   costUsd: number; // total court spend for this trial
   costComplete?: boolean;

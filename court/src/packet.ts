@@ -6,6 +6,7 @@ export type PacketOptions = {
   task?: string;
   spentUsd?: number; // total spend, when the events given are only a window
   progress?: EvidencePacket["progress"]; // full test history, same reason
+  runStartedAt?: string; // when the worker's run began, if the caller knows
 };
 
 // The engine sends only the last N events, so take spend and progress from its packet.
@@ -15,6 +16,7 @@ export function fromEnginePacket(p: EnginePacket, opts: { window?: number } = {}
     spentUsd: p.spend.costUsd,
     progress: p.testProgress,
     task: p.task,
+    runStartedAt: p.workerStartedAt,
     window: opts.window ?? Math.max(15, p.events.length),
   });
 }
@@ -75,6 +77,7 @@ export function buildPacket(charge: Charge, allEvents: Event[], opts: PacketOpti
     charge,
     workerId: charge.workerId,
     task: opts.task,
+    runSince: opts.runStartedAt ?? (mine.find((e) => e.step === 1) ?? mine[0])?.timestamp,
     events,
     progress,
     spend: { usd: round(usd), budgetUsd: opts.budgetUsd, fractionOfBudget: round(usd / opts.budgetUsd) },

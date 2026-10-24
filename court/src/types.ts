@@ -1,5 +1,5 @@
-// Shared contracts. Mirrors WORK_SPLIT.md; replace with an import from
-// shared/schema.ts once Person C lands it.
+// Shared contracts. Mirrors shared/schema.ts on Amelia's branch (Person A);
+// switch to importing it once that file is on this branch.
 
 export type Event = {
   id: number;
@@ -12,12 +12,14 @@ export type Event = {
   testsPassing: number;
   testsTotal: number;
   error?: string | null;
+  result?: string; // short summary of the tool output
   timestamp: string;
 };
 
 export type ChargeKind = "looping" | "overspending" | "stalling" | "flailing";
 
 export type Charge = {
+  id?: number; // set by the engine; lets a verdict point back at its charge
   workerId: string;
   kind: ChargeKind;
   summary: string;
@@ -35,9 +37,20 @@ export type Verdict = {
 
 // ---- Court-internal types (also what the UI and case log render) ----
 
+// What the engine POSTs (shared/schema.ts EvidencePacket).
+export type EnginePacket = {
+  charge: Charge;
+  events: Event[];
+  testProgress: { step: number; testsPassing: number; testsTotal: number }[];
+  spend: { costUsd: number; budgetUsd: number };
+  task: string;
+};
+
+// The court's enriched packet, built from an EnginePacket or a raw event log.
 export type EvidencePacket = {
   charge: Charge;
   workerId: string;
+  task?: string;
   events: Event[]; // the last N events for this worker, oldest first
   progress: { step: number; testsPassing: number; testsTotal: number }[];
   spend: { usd: number; budgetUsd: number; fractionOfBudget: number };

@@ -4,6 +4,7 @@ import type { EvidencePacket } from "./types.ts";
 // never the worker's own reasoning.
 export function renderPacket(p: EvidencePacket): string {
   const lines: string[] = [];
+  if (p.task) lines.push(`WORKER'S TASK: ${truncate(p.task, 300)}`);
   lines.push(`CHARGE: ${p.charge.kind.toUpperCase()} against ${p.workerId}`);
   lines.push(`Monitor summary: ${p.charge.summary}`);
   lines.push(`Charged events: ${p.charge.eventIds.map((id) => `#${id}`).join(", ")}`);
@@ -24,7 +25,8 @@ export function renderPacket(p: EvidencePacket): string {
   lines.push("EVENT LOG (oldest first):");
   for (const e of p.events) {
     const err = e.error ? ` ERROR: ${truncate(e.error, 160)}` : "";
-    lines.push(`#${e.id} step ${e.step} ${e.tool} ${truncate(JSON.stringify(e.args), 140)} | tests ${e.testsPassing}/${e.testsTotal} | $${e.costUsd.toFixed(4)}${err}`);
+    const out = e.result ? ` -> ${truncate(e.result, 120)}` : "";
+    lines.push(`#${e.id} step ${e.step} ${e.tool} ${truncate(JSON.stringify(e.args), 140)}${out} | tests ${e.testsPassing}/${e.testsTotal} | $${e.costUsd.toFixed(4)}${err}`);
   }
   return lines.join("\n");
 }

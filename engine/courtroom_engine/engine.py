@@ -37,7 +37,7 @@ class RunConfig:
         if not isinstance(self.task, str) or (self.model is not None and (not isinstance(self.model, str) or not self.model)):
             raise ValueError("task must be a string and model must be a nonempty string or omitted")
         get_task(self.task)
-        if self.brain not in DEFAULT_MODELS:
+        if not isinstance(self.brain, str) or self.brain not in DEFAULT_MODELS:
             raise ValueError("brain must be scripted, claude, or groq")
         if isinstance(self.budget_usd, bool) or not isinstance(self.budget_usd, (int, float)) or not math.isfinite(self.budget_usd) or self.budget_usd <= 0:
             raise ValueError("budgetUsd must be a positive finite number")
@@ -171,6 +171,7 @@ class Engine:
             "costMode": "simulated" if cfg.brain == "scripted" else "estimated_from_usage",
             "pricingDate": PRICES["verifiedAt"],
             "pricingSource": PRICES["source"],
+            "workerPricingSource": PRICES["groqSource"] if cfg.brain == "groq" else PRICES["source"],
             "successCriteria": "pending human definition; state is engine-reported test completion only",
             "withCourt": with_court.result(),
             "withoutCourt": without_court.result(),

@@ -1,6 +1,6 @@
 # Person C: questions and decisions
 
-Work through these alongside [tasks.md](tasks.md). **Answer section 1 first.** The other sections are learning prompts for when we test the implementation; they do not need to block coding.
+Work through these alongside the [Person C checkpoint and next steps](../docs/person-c-checkpoint.md). **Answer section 1 first.** The other sections are learning prompts for when we test the implementation; they do not need to block coding.
 
 Recommendations below are proposals, not decisions you have already made. Write your answers under each section or tell me in chat.
 

@@ -36,9 +36,21 @@ export function modelsFor(provider: Provider): { lawyer: string; judge: string }
 export const LAWYER_MODEL = modelsFor("anthropic").lawyer;
 export const JUDGE_MODEL = modelsFor("anthropic").judge;
 
-const PRICES = JSON.parse(readFileSync(new URL("../../shared/model-prices.json", import.meta.url), "utf8")) as {
-  verifiedAt: string; models: Record<string, number[]>; haikuLongContextThreshold: number; haikuLongContextRates: number[];
-};
+type PriceList = { verifiedAt: string; models: Record<string, number[]>; haikuLongContextThreshold: number; haikuLongContextRates: number[] };
+
+// shared/model-prices.json next to court/ by default; COURT_PRICES_PATH for a court deployed on its own.
+// Without a price list the court still runs, and every trial's cost is marked incomplete.
+function loadPrices(): PriceList {
+  const path = process.env.COURT_PRICES_PATH ?? new URL("../../shared/model-prices.json", import.meta.url);
+  try {
+    return JSON.parse(readFileSync(path, "utf8")) as PriceList;
+  } catch (err) {
+    console.warn(`court: no price list at ${String(path)} (${(err as Error).message}); trial costs will be marked incomplete`);
+    return { verifiedAt: "unknown", models: {}, haikuLongContextThreshold: Infinity, haikuLongContextRates: [] };
+  }
+}
+
+const PRICES = loadPrices();
 
 type Usage = { input_tokens: number; output_tokens: number; cache_creation_input_tokens?: number | null; cache_read_input_tokens?: number | null; cache_creation?: { ephemeral_1h_input_tokens?: number } | null };
 
@@ -50,7 +62,7 @@ export function costOf(model: string, usage: Usage): number | null {
   const hour = usage.cache_creation?.ephemeral_1h_input_tokens ?? 0;
   const long = key === "claude-haiku-5-5" && usage.input_tokens + writes + reads > PRICES.haikuLongContextThreshold;
   const rates = long ? PRICES.haikuLongContextRates : PRICES.models[key];
-  if (!rates) return null;
+  if (!rates?.length) return null;
   return (usage.input_tokens * rates[0] + usage.output_tokens * rates[1] + (writes - hour) * rates[2] + hour * rates[3] + reads * rates[4]) / 1_000_000;
 }
 

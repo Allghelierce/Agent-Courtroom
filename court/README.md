@@ -39,4 +39,16 @@ curl localhost:4100/cases                                   # every Trial, oldes
 curl localhost:4100/cases/case-d399b1db                     # one Trial, 404 if missing
 ```
 
+**Engine endpoint.** `POST /verdict` is the contract from `shared/schema.ts`. The body is the engine's `EvidencePacket`, `{charge, events, testProgress, spend: {costUsd, budgetUsd}, task}`. The response is just the `Verdict`, and the saved trial's ID comes back in the `X-Case-Id` header. A missing or mistyped field returns 400. To build a body from the fixture by hand:
+
+```bash
+node -e 'const r=require("./fixtures/looping-run.json"), ev=r.events; console.log(JSON.stringify({
+  charge: r.charge, events: ev,
+  testProgress: ev.map(e => ({step: e.step, testsPassing: e.testsPassing, testsTotal: e.testsTotal})),
+  spend: {costUsd: ev.reduce((a, e) => a + e.costUsd, 0), budgetUsd: r.budgetUsd},
+  task: "Make the failing test suite pass"}))' > /tmp/engine-packet.json
+curl -i -X POST localhost:4100/verdict \
+  -H 'Content-Type: application/json' -d @/tmp/engine-packet.json   # Verdict + X-Case-Id header
+```
+
 Run with `COURT_MOCK=1` to try it without calling a model.

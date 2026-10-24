@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildPacket } from "../src/packet.ts";
 import { holdTrial } from "../src/court.ts";
-import { loadFixture } from "./helpers.ts";
+import { ev, loadFixture } from "./helpers.ts";
 
 const { events, charge, budgetUsd } = loadFixture();
 
@@ -39,11 +39,28 @@ test("mock court halts when spend is at least 90% of budget", async () => {
   assert.equal(trial.verdict.instruction, undefined);
 });
 
-test("mock court escalates flailing with 5 or more errors", async () => {
-  const packet = buildPacket({ ...charge, kind: "flailing" }, events, { budgetUsd });
-  assert.ok(packet.stats.errorsInWindow >= 5);
+// Flailing is about the tool itself failing (e.error), so build it from synthetic tool errors.
+function flailing(toolErrors: number) {
+  const evts = Array.from({ length: 8 }, (_, i) =>
+    i < toolErrors
+      ? ev(i + 1, "edit_file", { path: "src/gateway.py", old_str: `attempt ${i}`, new_str: "fix" }, { error: "old_str not found" })
+      : ev(i + 1, "run_tests", {}, { result: "FAILED test_charge: Connection refused" }),
+  );
+  return buildPacket({ workerId: "w", kind: "flailing", summary: "edit_file keeps failing", eventIds: evts.map((e) => e.id) }, evts, { budgetUsd: 1 });
+}
+
+test("mock court escalates flailing with 5 or more tool errors", async () => {
+  const packet = flailing(5);
+  assert.equal(packet.stats.errorsInWindow, 5);
   const trial = await holdTrial(packet, { mock: true });
   assert.equal(trial.verdict.ruling, "escalate");
+});
+
+test("mock court does not escalate flailing with only 4 tool errors", async () => {
+  const packet = flailing(4);
+  assert.equal(packet.stats.errorsInWindow, 4);
+  const trial = await holdTrial(packet, { mock: true });
+  assert.notEqual(trial.verdict.ruling, "escalate");
 });
 
 test("onTrial receives the finished trial", async () => {

@@ -2,23 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildPacket, callKey } from "../src/packet.ts";
 import type { Charge, Event } from "../src/types.ts";
-
-// Engine-style events: failures live in `result`, run_tests args are {}.
-function ev(id: number, tool: string, args: Record<string, unknown>, extra: Partial<Event> = {}): Event {
-  return {
-    id,
-    workerId: "w",
-    step: id,
-    tool,
-    args,
-    tokens: 100,
-    costUsd: 0.01,
-    testsPassing: 5,
-    testsTotal: 10,
-    timestamp: `2026-10-24T22:00:${String(id).padStart(2, "0")}Z`,
-    ...extra,
-  };
-}
+import { ev } from "./helpers.ts";
 
 const charge = (eventIds: number[]): Charge => ({ workerId: "w", kind: "looping", summary: "s", eventIds });
 const packet = (events: Event[]) => buildPacket(charge(events.map((e) => e.id)), events, { budgetUsd: 1 });
@@ -87,4 +71,23 @@ test("an event error still wins over a later failing result", () => {
     ev(2, "run_tests", {}, { result: "1 failed" }),
   ]);
   assert.equal(p.stats.lastError, "ECONNREFUSED api.example:443");
+});
+
+test("lastError fallback only reads run_tests results, not file contents", () => {
+  const p = packet([
+    ev(1, "run_tests", {}, { result: "FAILED test_fetch: Connection refused" }),
+    ev(2, "read_file", { path: "a.py" }, { result: "def f():\n    raise ValueError('bad input error')" }),
+    ev(3, "edit_file", { path: "a.py", old_str: "x", new_str: "y" }, { result: "edited a.py: added error handling" }),
+  ]);
+  assert.equal(p.stats.lastError, "FAILED test_fetch: Connection refused");
+});
+
+test("errorsInWindow counts tool errors only, not failing test results", () => {
+  const p = packet([
+    ev(1, "run_tests", {}, { result: "3 failed" }),
+    ev(2, "edit_file", { path: "a.py", old_str: "x", new_str: "y" }, { error: "old_str not found" }),
+    ev(3, "run_tests", {}, { result: "3 failed" }),
+  ]);
+  assert.equal(p.stats.errorsInWindow, 1);
+  assert.deepEqual(p.stats.distinctErrors, ["old_str not found"]);
 });

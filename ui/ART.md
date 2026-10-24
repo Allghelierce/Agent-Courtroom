@@ -4,7 +4,7 @@ Read this before you touch anything visual. Every screen in `ui/` follows it, so
 
 ## North star
 
-**A tiny, adorable courthouse for robots.** Picture a pastel pixel-art visual novel: chibi lawyers with huge sparkly eyes argue over a worker who got stuck in a loop. It should make a judge at the demo smile within two seconds, and then the numbers on the screen should be just as easy to read as the jokes.
+**A tiny night-time courthouse for robots.** Picture an anime pixel-art visual novel at night: chibi lawyers with huge sparkly eyes argue over a worker who got stuck in a loop, in a dark purple courtroom lit by gold. It should make a judge at the demo smile within two seconds, and then the numbers on the screen should be just as easy to read as the jokes. Cute, not girly: the cuteness comes from the characters, while the room and the interface stay dark, bold and game-like.
 
 Two rules hold everything together:
 
@@ -22,33 +22,37 @@ Two rules hold everything together:
 
 ## Palette
 
-One light pastel theme. It's a demo on a projector, and pastel reads well and stands out from every dark dashboard in the room.
+One dark theme: the palette of the original anime-pixel mockup. Tokens live in `app/globals.css`.
 
 | Token | Hex | Use |
 |---|---|---|
-| `--ink` | `#2d1b3d` | Plum. All outlines, all text, hard shadows. Never pure black. |
-| `--ink-soft` | `#6b5a7e` | Secondary text, idle lights, halted state. |
-| `--paper` | `#fff7fb` | Panel and card fill. |
-| `--blush` | `#ffe1ee` | Secondary fill: table stripes, inset areas, empty bar segments. |
-| `--lilac` | `#c9bcff` | Page background (with a `#bfb0ff` 8px checker). |
-| `--lilac-deep` | `#9d8cff` | Clerk colour, focus rings, links. |
-| `--gold` | `#ffc93c` | **Judge.** Verdicts, the "watch" state, highlights. |
-| `--berry` | `#ff5c8a` | **Prosecution.** "On trial", OBJECTION!, overspend. |
-| `--sky` | `#4fb3ff` | **Defense.** HOLD IT!, tests passing on the defense side. |
-| `--mint` | `#3ddc97` | **Worker.** Healthy state, tests passing bars. |
-| `--wood` / `--wood-mid` / `--wood-dark` | `#f6b27a` / `#d9825a` / `#9c5236` | Benches, the bench, the witness stand. |
+| `--bg` | `#0b0814` | Page background (with a faint `#0e0a1a` 8px checker). |
+| `--panel` | `#1b1430` | Panel and card fill. |
+| `--inset` | `#120c22` | Sunken areas, empty meter cells, ghost buttons. |
+| `--edge` | `#3b2f57` | Panel borders and pixel outlines in the UI. |
+| `--shadow` | `#000000` | Hard drop shadows. |
+| `--text` | `#f6eedd` | Body text. |
+| `--soft` | `#b9aed0` | Secondary text, idle lights, the clerk, the halted state. |
+| `--on-accent` | `#120c22` | Text on any bright fill (tags, buttons, stamps). |
+| `--gold` | `#f7c948` | **Judge.** Verdicts, the "new plan" state, primary buttons, the title. |
+| `--red` | `#ff5d73` | **Prosecution.** "On trial", OBJECTION!, overspending. |
+| `--blue` | `#5cc8ff` | **Defense.** HOLD IT!. |
+| `--green` | `#7af0c4` | **Worker.** Healthy state, tests passing. |
+| `--amber` | `#ffb347` | Needs a human; spend meters. |
 
-**Role colours are meaning, not decoration.** Gold always means the Judge or a verdict, berry always means prosecution or trouble, sky always means defense, mint always means a working, healthy worker. Don't use them for anything else.
+Scene colours (canvas only): wall `#2a1d4a` with `#3a2a63` pillars, wood `#c98a4a` / `#8f5530` / `#6e3f22`, plum checker floor `#4a2c3e` / `#5a3650`, carpet `#7a2348`, sakura windows `#ffb7d5`, sprite outlines `#120c22`.
+
+**Role colours are meaning, not decoration.** Gold always means the Judge or a verdict, red always means prosecution or trouble, blue always means defense, green always means a working, healthy worker. Don't use them for anything else.
 
 Status mapping (dashboard, case log, badges):
 
 | Status | Colour | Shown when |
 |---|---|---|
-| Working | mint | No open charge, or the court ruled `continue`. |
-| On trial | berry | A charge is filed and court is in session. |
+| Working | green | No open charge, or the court ruled `continue`. |
+| On trial | red | A charge is filed and court is in session. |
 | New plan | gold | Ruling `change_strategy`. |
-| Needs a human | lilac-deep | Ruling `escalate`. |
-| Halted | ink-soft | Ruling `halt`. |
+| Needs a human | amber | Ruling `escalate`. |
+| Halted | soft | Ruling `halt`. |
 
 ## Type
 
@@ -62,16 +66,16 @@ Status mapping (dashboard, case log, badges):
 
 Use the shared classes in `app/globals.css`. Don't hand-roll borders.
 
-- `.px-box`: the standard panel. Paper fill, 4px ink border, square corners, a hard `4px 4px 0` ink shadow.
-- `.px-inset`: a sunken area inside a panel (blush fill, no shadow).
-- `.px-btn`: a pressable button. It sits on a 4px ink shadow and drops onto it when pressed.
+- `.px-box`: the standard panel. Panel fill, 4px edge border, square corners, a hard `4px 4px 0` black shadow.
+- `.px-inset`: a sunken area inside a panel (inset fill, no shadow).
+- `.px-btn`: a pressable button. It sits on a 4px shadow and drops onto it when pressed. Gold is primary, `.red` is the "watch the trial" call to action, `.ghost` is secondary.
 - `.px-tag`: a small coloured label (status badges, the dialogue name tag).
 - Meters are **segmented**: 12 or 20 square cells with a 4px gap, never a smooth bar. Tests passing uses one cell per test.
-- Warning lights are 4 square pixel lamps (looping, stuck, overspend, flailing). Off is a hollow ink square, on is a filled role colour with a 4px "glow" ring in the same colour at 40%.
+- Warning lights are 4 square pixel lamps (looping, stuck, overspend, flailing). Off is a hollow edge-coloured square, on is a filled role colour with a 4px "glow" ring in the same colour at 40%.
 
 ## Characters
 
-Every character is drawn in code (`lib/sprites.ts`) from one shared chibi template so they match. Proportions: 2 heads tall, the head is wider than the body, and the eyes take up a third of the face. Every sprite gets a generated **1px `--ink` outline**. Never hand-draw outlines, so they stay consistent.
+Every character is drawn in code (`lib/sprites.ts`) from one shared chibi template so they match. Proportions: 2 heads tall, the head is wider than the body, and the eyes take up a third of the face. Every sprite gets a generated **1px `#120c22` outline**. Never hand-draw outlines, so they stay consistent.
 
 | Role | Name | Hair | Eyes | Signature |
 |---|---|---|---|---|
@@ -79,13 +83,13 @@ Every character is drawn in code (`lib/sprites.ts`) from one shared chibi templa
 | Prosecution | Prosecutor Aka | spiky strawberry red | orange | white cravat, points a lot |
 | Defense | Defense Aoi | blue with an ahoge (one stray strand) | sky | gold badge, papers |
 | Worker | worker-NN | mint bob | amber | antenna with a gold tip, headphones |
-| Clerk | Clerk | (no sprite) | | a lilac speaker icon in the portrait slot |
+| Clerk | Clerk | (no sprite) | | a soft-grey speaker icon in the portrait slot |
 
 Eyes always have **two white highlight pixels** (top-left big, bottom-right small) and every face has **blush** pixels. That's most of the cuteness. Expressions (`mood`): `neutral`, `happy`, `shout`, `angry`, `worried`, `dizzy` (swirl eyes, for a looping worker).
 
 ## The courtroom scene
 
-Layout at 256 × 144: the Judge's bench is top centre. The prosecution desk (left), the witness stand with the worker (centre) and the defense desk (right) sit in one row in front of it. Everything important stays above y = 104, because on wide screens the dialogue box covers the floor, visual-novel style. Draw order, back to front: wall, Judge, bench and gavel, lawyers and worker, desks and stand. Pastel lilac wall, pink sakura windows, a gold scales-of-justice emblem, a pink and lilac checker floor.
+Layout at 256 × 144: the Judge's bench is top centre. The prosecution desk (left), the witness stand with the worker (centre) and the defense desk (right) sit in one row in front of it. Everything important stays above y = 104, because on wide screens the dialogue box covers the floor, visual-novel style. Draw order, back to front: wall, Judge, bench and gavel, lawyers and worker, desks and stand. Dark purple wall with pillars, sakura windows, a gold scales-of-justice emblem, a plum checker floor and a red carpet.
 
 - Whoever is speaking bobs by 1 pixel and gets a small gold arrow over their head.
 - A looping worker has a little orbiting dot swirl over their head.
@@ -94,7 +98,7 @@ Layout at 256 × 144: the Judge's bench is top centre. The prosecution desk (lef
 
 - **All animation uses `steps()` timing**, never ease curves, so it moves like a sprite (8–12 frames per second).
 - Big moments, each used once per beat:
-  - **OBJECTION!** (berry) when the prosecution speaks, **HOLD IT!** (sky) when the defense speaks: a jagged burst plus a 4-pixel screen shake.
+  - **OBJECTION!** (red) when the prosecution speaks, **HOLD IT!** (blue) when the defense speaks: a jagged burst plus a 4-pixel screen shake.
   - **The verdict stamp**: the ruling slams onto the screen with a slight rotation.
 - Dialogue types out 2 characters per frame. Click, Space or Enter finishes the line, and a second press goes to the next one.
 - `prefers-reduced-motion`: no shake, no bob, no typing (full lines appear at once), bursts and stamps just appear.
@@ -111,6 +115,6 @@ The characters are dramatic and cute. The interface is not.
 
 - No rounded corners, blur, soft drop shadows, or smooth gradients.
 - No emoji in the UI. If you need an icon, draw it as pixels on an 8 × 8 or 16 × 16 grid.
-- No dark mode. One pastel theme.
-- No new colours. If something needs a colour, it's either a role colour (with its meaning) or ink.
+- No light mode, and no pastel or pink UI. One dark theme; pink lives only in the sakura windows and petals.
+- No new colours. If something needs a colour, it's either a role colour (with its meaning) or a neutral token.
 - No decoration on data: tables and meters stay flat and aligned.

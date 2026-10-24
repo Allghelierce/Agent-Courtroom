@@ -116,15 +116,15 @@ function Trial({ trial }: { trial: Trial }) {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <Link href="/cases" className="text-sm text-ink-soft">Back to the case log</Link>
+          <Link href="/cases" className="text-sm text-soft">Back to the case log</Link>
           <h1 className="text-[28px]">
             {trial.workerId} on {repoFor(trial.workerId)}: {KIND_LABEL[trial.charge.kind].toLowerCase()}
           </h1>
         </div>
-        <span className="text-sm text-ink-soft">Case {trial.id}</span>
+        <span className="text-sm text-soft">Case {trial.id}</span>
       </div>
 
-      <div key={line.burst ? idx : "stage"} className={`relative overflow-hidden border-4 border-ink bg-[#b9a8ff] ${line.burst && !still ? "shake" : ""}`} style={{ boxShadow: "4px 4px 0 var(--ink)" }}>
+      <div key={line.burst ? idx : "stage"} className={`relative overflow-hidden border-4 border-edge bg-[#2a1d4a] ${line.burst && !still ? "shake" : ""}`} style={{ boxShadow: "4px 4px 0 var(--shadow)" }}>
         <button type="button" onClick={advance} aria-label="Next line" className="block w-full cursor-pointer border-0 bg-transparent p-0">
           <CourtScene
             speaker={line.who}
@@ -138,9 +138,9 @@ function Trial({ trial }: { trial: Trial }) {
         {line.verdict && <VerdictStamp trial={trial} />}
 
         {/* The dialogue box sits over the floor on wide screens, visual-novel style, and below the scene on phones. */}
-        <div className="border-t-4 border-ink bg-paper lg:absolute lg:inset-x-0 lg:bottom-4 lg:mx-auto lg:max-w-[960px] lg:border-4 lg:shadow-[4px_4px_0_var(--ink)]" aria-live="polite">
+        <div className="border-t-4 border-edge bg-panel lg:absolute lg:inset-x-0 lg:bottom-4 lg:mx-auto lg:max-w-[960px] lg:border-4 lg:shadow-[4px_4px_0_var(--shadow)]" aria-live="polite">
           <div className="flex gap-4 p-3">
-            <div className="hidden shrink-0 self-start border-4 border-ink sm:block">
+            <div className="hidden shrink-0 self-start border-4 border-edge sm:block">
               <Portrait who={line.who} mood={line.mood} scale={2} />
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -157,14 +157,14 @@ function Trial({ trial }: { trial: Trial }) {
         <button type="button" className="px-btn" onClick={advance} disabled={done && last}>{done ? "Next line" : "Show the whole line"}</button>
         <button type="button" className="px-btn ghost" aria-pressed={auto} onClick={() => setAuto(!auto)}>Auto-play {auto ? "on" : "off"}</button>
         {last && done && <button type="button" className="px-btn ghost" onClick={() => setIdx(0)}>Replay the trial</button>}
-        <span className="ml-auto text-sm text-ink-soft">Line {idx + 1} of {script.length}. Space or click for the next line.</span>
+        <span className="ml-auto text-sm text-soft">Line {idx + 1} of {script.length}. Space or click for the next line.</span>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="px-box flex flex-col gap-3 p-4" aria-labelledby="evidence-h">
           <h2 id="evidence-h" className="text-[20px]">Evidence</h2>
           {evidence.length === 0 ? (
-            <p className="m-0 text-sm text-ink-soft">{line.cites?.length ? `Cites ${line.cites.map((n) => `event ${n}`).join(", ")}.` : "No events cited in this line."}</p>
+            <p className="m-0 text-sm text-soft">{line.cites?.length ? `Cites ${line.cites.map((n) => `event ${n}`).join(", ")}.` : "No events cited in this line."}</p>
           ) : (
             <ul className="m-0 flex list-none flex-col gap-2 p-0">
               {evidence.map((e) => (
@@ -173,8 +173,8 @@ function Trial({ trial }: { trial: Trial }) {
                     <span className="font-display">event {e.id}</span>
                     <span>{e.testsPassing}/{e.testsTotal} tests · {usd(e.costUsd)}</span>
                   </div>
-                  <span style={eventFailed(e) ? { color: "#b8264f" } : undefined}>{describeEvent(e)}</span>
-                  {e.error && <span style={{ color: "#b8264f" }}>{e.error}</span>}
+                  <span style={eventFailed(e) ? { color: "#ff8a9a" } : undefined}>{describeEvent(e)}</span>
+                  {e.error && <span style={{ color: "#ff8a9a" }}>{e.error}</span>}
                 </li>
               ))}
             </ul>
@@ -184,13 +184,13 @@ function Trial({ trial }: { trial: Trial }) {
         <section className="px-box flex flex-col gap-3 p-4" aria-labelledby="facts-h">
           <h2 id="facts-h" className="text-[20px]">The case</h2>
           <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-            <dt className="text-ink-soft">Charge</dt>
+            <dt className="text-soft">Charge</dt>
             <dd className="m-0">{trial.charge.summary}</dd>
-            <dt className="text-ink-soft">Ruling</dt>
+            <dt className="text-soft">Ruling</dt>
             <dd className="m-0">{reachedVerdict ? <RulingTag ruling={trial.verdict.ruling} /> : "Waiting for the Judge"}</dd>
-            <dt className="text-ink-soft">Court cost</dt>
+            <dt className="text-soft">Court cost</dt>
             <dd className="m-0">{usd(trial.costUsd)}{trial.mock ? " (mock run, no model calls)" : ""}</dd>
-            <dt className="text-ink-soft">Models</dt>
+            <dt className="text-soft">Models</dt>
             <dd className="m-0">Prosecution {trial.prosecution.model}, defense {trial.defense.model}, judge {trial.judgeModel}</dd>
           </dl>
         </section>
@@ -202,7 +202,7 @@ function Trial({ trial }: { trial: Trial }) {
 function VerdictStamp({ trial }: { trial: Trial }) {
   return (
     <div className="pointer-events-none absolute inset-0 flex items-start justify-end p-4">
-      <div className="stamp border-4 border-ink px-5 py-3 text-center" style={{ background: RULING_COLOR[trial.verdict.ruling], boxShadow: "4px 4px 0 var(--ink)" }}>
+      <div className="stamp border-4 border-edge px-5 py-3 text-center" style={{ background: RULING_COLOR[trial.verdict.ruling], boxShadow: "4px 4px 0 var(--shadow)" }}>
         <div className="font-display text-sm">Verdict</div>
         <div className="font-display text-[28px] leading-none sm:text-[40px]">{RULING_LABEL[trial.verdict.ruling]}</div>
       </div>

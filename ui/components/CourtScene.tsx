@@ -15,8 +15,8 @@ type Props = {
 };
 
 const ACTORS: Actor[] = ["judge", "pros", "def", "worker"]; // for the mood cache key
-const GOLD = "#ffc93c";
-const INK = "#2d1b3d";
+const GOLD = "#f7c948";
+const INK = "#120c22";
 
 export function CourtScene({ speaker, moods = {}, swirl = false, gavelDown = false, workerLabel = "a worker", maxScale = 6 }: Props) {
   // Static layers and sprites are built once per mood on the client and reused every frame.
@@ -39,8 +39,9 @@ export function CourtScene({ speaker, moods = {}, swirl = false, gavelDown = fal
       for (let i = 0; i < 12; i++) {
         const x = (i * 41 + tick * (1 + (i % 3))) % SCENE_W;
         const y = (i * 19 + tick * 2) % 70;
-        ctx.fillStyle = "#ff8fbf";
+        ctx.fillStyle = "#ffb7d5";
         ctx.fillRect(x, y, 2, 1);
+        ctx.fillStyle = "#ff8fbf";
         ctx.fillRect(x + 1, y + 1, 1, 1);
       }
 
@@ -78,7 +79,7 @@ export function CourtScene({ speaker, moods = {}, swirl = false, gavelDown = fal
         const cy = y - 1;
         const pts = [[0, -3], [3, 0], [0, 3], [-3, 0]];
         pts.forEach(([dx, dy], i) => {
-          ctx.fillStyle = i === tick % 4 ? GOLD : "#ff8fbf";
+          ctx.fillStyle = i === tick % 4 ? "#ffb347" : "#7a5a2a";
           ctx.fillRect(cx + dx - 1, cy + dy - 1, 2, 2);
         });
       }

@@ -1,13 +1,13 @@
 // All pixel art is drawn here from code, so every character shares one template (ART.md, "Characters").
 // Shapes go into a Pix buffer first; outline() then adds the 1px ink edge to every silhouette.
 
-export const INK = "#2d1b3d";
+export const INK = "#120c22";
 const WHITE = "#ffffff";
-const BLUSH = "#ff9ab8";
-const MOUTH = "#9c3a5c";
+const BLUSH = "#ff9aa8";
+const MOUTH = "#7a2348";
 const TONGUE = "#ff8fae";
-const GOLD = "#ffc93c";
-const GOLD_D = "#c98a1a";
+const GOLD = "#f7c948";
+const GOLD_D = "#a5781e";
 const SWEAT = "#8fd3ff";
 
 export type CastKey = "judge" | "pros" | "def" | "worker" | "clerk";
@@ -29,11 +29,11 @@ type Look = {
 };
 
 export const CAST: Record<Exclude<CastKey, "clerk">, Look> & { clerk: { name: string; tag: string } } = {
-  judge: { name: "JUDGE HAKU", tag: "#ffc93c", hair: "#eef0fa", hairD: "#a9b0c8", hairL: WHITE, eye: "#ffb321", skin: "#ffe2cc", skinD: "#f2b49a", outfit: "#4a3566", outfitD: "#33244a", trim: GOLD, style: "long" },
-  pros: { name: "PROSECUTOR AKA", tag: "#ff5c8a", hair: "#ff5a6e", hairD: "#c22f4b", hairL: "#ff9aa6", eye: "#ff8a3d", skin: "#ffe6d2", skinD: "#f2b49a", outfit: "#e0365e", outfitD: "#a8203f", trim: WHITE, style: "spiky" },
-  def: { name: "DEFENSE AOI", tag: "#4fb3ff", hair: "#4a86ff", hairD: "#2a52b8", hairL: "#9cc4ff", eye: "#36a9ff", skin: "#ffe6d2", skinD: "#f2b49a", outfit: "#3550a0", outfitD: "#233670", trim: GOLD, style: "ahoge" },
-  worker: { name: "WORKER", tag: "#3ddc97", hair: "#5ff0b8", hairD: "#25a87c", hairL: "#b4ffe0", eye: "#ffaa33", skin: "#f6f2ff", skinD: "#d4cbef", outfit: "#7a68b8", outfitD: "#56468e", trim: "#5ff0b8", style: "bob" },
-  clerk: { name: "CLERK", tag: "#9d8cff" },
+  judge: { name: "JUDGE HAKU", tag: "#f7c948", hair: "#e8ecf5", hairD: "#9aa3b8", hairL: WHITE, eye: "#f7c948", skin: "#ffd9bf", skinD: "#e9a98a", outfit: "#1d1630", outfitD: "#0e0a18", trim: GOLD, style: "long" },
+  pros: { name: "PROSECUTOR AKA", tag: "#ff5d73", hair: "#ff4d5e", hairD: "#a3203a", hairL: "#ff8a96", eye: "#ff8a3d", skin: "#ffe0c8", skinD: "#eaa98c", outfit: "#b0213f", outfitD: "#6e1428", trim: "#f6eedd", style: "spiky" },
+  def: { name: "DEFENSE AOI", tag: "#5cc8ff", hair: "#3a7bff", hairD: "#1f3f99", hairL: "#8fb4ff", eye: "#5cc8ff", skin: "#ffe3cc", skinD: "#eaa98c", outfit: "#23305e", outfitD: "#141c3b", trim: GOLD, style: "ahoge" },
+  worker: { name: "WORKER", tag: "#7af0c4", hair: "#7af0c4", hairD: "#2f9e86", hairL: "#c4fff0", eye: "#ffb347", skin: "#f3f0ff", skinD: "#c9c2e6", outfit: "#3b2f57", outfitD: "#241b3a", trim: "#7af0c4", style: "bob" },
+  clerk: { name: "CLERK", tag: "#b9aed0" },
 };
 
 // ---------- pixel buffer ----------
@@ -173,16 +173,16 @@ export const BUST = 48;
 
 export function portrait(who: CastKey, mood: Mood = "neutral"): Pix {
   const bg = new Pix(BUST, BUST);
-  bg.rect(0, 0, BUST, BUST, "#ffe1ee");
-  for (let y = 0; y < BUST; y += 4) for (let x = (y / 4) % 2 === 0 ? 0 : 4; x < BUST; x += 8) bg.rect(x, y, 4, 4, "#ffd2e5");
+  bg.rect(0, 0, BUST, BUST, "#2a1f45");
+  for (let y = 0; y < BUST; y += 4) bg.rect(0, y, BUST, 2, "#2f2350");
 
   if (who === "clerk") {
     // a little lilac speaker icon: the clerk has no face
     const icon = new Pix(BUST, BUST);
-    icon.rect(13, 18, 8, 12, "#9d8cff");
-    icon.rect(21, 13, 4, 22, "#9d8cff");
-    icon.rect(25, 9, 3, 30, "#9d8cff");
-    icon.rect(31, 18, 2, 12, "#6b5a7e"); icon.rect(35, 14, 2, 20, "#6b5a7e");
+    icon.rect(13, 18, 8, 12, "#b9aed0");
+    icon.rect(21, 13, 4, 22, "#b9aed0");
+    icon.rect(25, 9, 3, 30, "#b9aed0");
+    icon.rect(31, 18, 2, 12, "#f6eedd"); icon.rect(35, 14, 2, 20, "#f6eedd");
     icon.outline();
     return compose(bg, icon);
   }
@@ -276,45 +276,42 @@ export const STAGE: Record<Exclude<CastKey, "clerk">, { x: number; y: number }> 
 
 export function sceneBack(): Pix {
   const p = new Pix(SCENE_W, SCENE_H);
-  // wall: lilac with soft pink wallpaper stripes
-  p.rect(0, 0, SCENE_W, FLOOR_Y, "#b9a8ff");
-  for (let x = 0; x < SCENE_W; x += 16) p.rect(x, 8, 8, FLOOR_Y - 8, "#c4b5ff");
-  for (let x = 4; x < SCENE_W; x += 16) for (let y = 16; y < FLOOR_Y - 8; y += 16) { p.rect(x, y, 1, 1, "#ffd2e5"); }
-  p.rect(0, 0, SCENE_W, 6, "#8f7ae6");
-  p.rect(0, 6, SCENE_W, 2, "#ffd2e5");
+  // wall: night purple with pillar stripes
+  p.rect(0, 0, SCENE_W, FLOOR_Y, "#2a1d4a");
+  for (let x = 0; x < SCENE_W; x += 32) { p.rect(x, 8, 4, FLOOR_Y - 8, "#3a2a63"); p.rect(x + 4, 8, 1, FLOOR_Y - 8, "#4b3a7a"); }
+  p.rect(0, 0, SCENE_W, 6, "#150f28");
+  p.rect(0, 6, SCENE_W, 2, "#5b4a8f");
   // wainscot
-  p.rect(0, FLOOR_Y - 14, SCENE_W, 14, "#d9825a");
-  p.rect(0, FLOOR_Y - 14, SCENE_W, 2, "#f6b27a");
-  for (let x = 6; x < SCENE_W; x += 20) p.rect(x, FLOOR_Y - 10, 14, 8, "#c4704a");
+  p.rect(0, FLOOR_Y - 14, SCENE_W, 14, "#6e3f22");
+  p.rect(0, FLOOR_Y - 14, SCENE_W, 2, "#c98a4a");
+  for (let x = 6; x < SCENE_W; x += 20) p.rect(x, FLOOR_Y - 10, 14, 8, "#8f5530");
 
   // sakura windows
   for (const wx of [14, 210]) {
-    p.rect(wx - 2, 14, 36, 44, INK);
-    p.rect(wx, 16, 32, 40, "#ffd2e5");
-    p.rect(wx, 16, 32, 14, "#ffe9f2");
-    p.rect(wx, 44, 32, 12, "#ffb3d1");
-    for (const [bx, by] of [[4, 34], [10, 30], [20, 36], [26, 32], [15, 40]]) p.rect(wx + bx, by, 3, 3, "#ff8fbf");
-    p.rect(wx + 15, 16, 2, 40, INK);
-    p.rect(wx, 35, 32, 2, INK);
-    p.rect(wx - 4, 58, 40, 3, "#f6b27a");
+    p.rect(wx - 2, 14, 36, 44, "#150f28");
+    p.rect(wx, 16, 32, 40, "#ffb7d5");
+    p.rect(wx, 16, 32, 14, "#ffd6e8");
+    for (const [bx, by] of [[4, 34], [10, 30], [20, 36], [26, 32], [15, 44]]) p.rect(wx + bx, by, 3, 3, "#ff8fbf");
+    p.rect(wx + 15, 16, 2, 40, "#150f28");
+    p.rect(wx, 35, 32, 2, "#150f28");
+    p.rect(wx - 4, 58, 40, 3, "#c98a4a");
   }
 
-  // gold scales-of-justice emblem with a heart
-  p.rect(114, 9, 28, 18, GOLD_D);
+  // gold scales-of-justice emblem
+  p.rect(114, 9, 28, 18, "#a5781e");
   p.rect(116, 11, 24, 14, GOLD);
-  p.rect(127, 12, 2, 12, GOLD_D);
-  p.rect(119, 14, 18, 1, GOLD_D);
-  p.rect(118, 15, 1, 3, GOLD_D); p.rect(137, 15, 1, 3, GOLD_D);
-  p.rect(116, 18, 5, 1, GOLD_D); p.rect(135, 18, 5, 1, GOLD_D);
-  p.rect(125, 22, 6, 2, GOLD_D);
-  p.rect(126, 10, 1, 1, "#ff5c8a"); p.rect(129, 10, 1, 1, "#ff5c8a"); p.rect(126, 11, 4, 1, "#ff5c8a"); p.rect(127, 12, 2, 1, "#ff5c8a");
+  p.rect(127, 12, 2, 12, "#5a3f10");
+  p.rect(119, 14, 18, 1, "#5a3f10");
+  p.rect(118, 15, 1, 3, "#5a3f10"); p.rect(137, 15, 1, 3, "#5a3f10");
+  p.rect(116, 18, 5, 1, "#5a3f10"); p.rect(135, 18, 5, 1, "#5a3f10");
+  p.rect(125, 22, 6, 2, "#5a3f10");
 
-  // floor: pink and lilac checker
-  p.rect(0, FLOOR_Y, SCENE_W, SCENE_H - FLOOR_Y, "#ffc8de");
-  for (let y = FLOOR_Y; y < SCENE_H; y += 8) for (let x = ((y - FLOOR_Y) / 8) % 2 === 0 ? 0 : 16; x < SCENE_W; x += 32) p.rect(x, y, 16, 8, "#e3d6ff");
-  p.rect(0, FLOOR_Y, SCENE_W, 1, INK);
-  // red carpet up the middle
-  p.rect(104, FLOOR_Y + 1, 48, SCENE_H - FLOOR_Y, "#ff7aa0");
+  // floor: plum checker
+  p.rect(0, FLOOR_Y, SCENE_W, SCENE_H - FLOOR_Y, "#4a2c3e");
+  for (let y = FLOOR_Y; y < SCENE_H; y += 8) for (let x = ((y - FLOOR_Y) / 8) % 2 === 0 ? 0 : 16; x < SCENE_W; x += 32) p.rect(x, y, 16, 8, "#5a3650");
+  p.rect(0, FLOOR_Y, SCENE_W, 1, "#24142a");
+  // carpet up the middle
+  p.rect(104, FLOOR_Y + 1, 48, SCENE_H - FLOOR_Y, "#7a2348");
   p.rect(104, FLOOR_Y + 1, 2, SCENE_H - FLOOR_Y, GOLD); p.rect(150, FLOOR_Y + 1, 2, SCENE_H - FLOOR_Y, GOLD);
   return p;
 }
@@ -322,11 +319,11 @@ export function sceneBack(): Pix {
 // The Judge's bench: in front of the Judge, behind everyone else.
 export function sceneBench(): Pix {
   const p = new Pix(SCENE_W, SCENE_H);
-  p.rect(84, 46, 88, 4, "#f6b27a");
-  p.rect(86, 50, 84, 28, "#9c5236");
-  for (const bx of [90, 118, 146]) { p.rect(bx, 54, 20, 20, "#d9825a"); p.rect(bx, 54, 20, 1, "#f6b27a"); }
+  p.rect(84, 46, 88, 4, "#c98a4a");
+  p.rect(86, 50, 84, 28, "#6e3f22");
+  for (const bx of [90, 118, 146]) { p.rect(bx, 54, 20, 20, "#8f5530"); p.rect(bx, 54, 20, 1, "#b06e3e"); }
   p.rect(116, 47, 24, 3, GOLD);
-  p.rect(124, 58, 8, 8, GOLD); p.rect(126, 60, 4, 4, GOLD_D);
+  p.rect(124, 58, 8, 8, GOLD); p.rect(126, 60, 4, 4, "#a5781e");
   return p.outline();
 }
 
@@ -335,28 +332,29 @@ export function sceneFront(): Pix {
   const p = new Pix(SCENE_W, SCENE_H);
   // prosecution and defense desks
   for (const dx of [10, 184]) {
-    p.rect(dx, 82, 62, 4, "#f6b27a");
-    p.rect(dx + 2, 86, 58, 22, "#d9825a");
-    p.rect(dx + 2, 86, 58, 1, "#9c5236");
-    p.rect(dx + 6, 90, 50, 14, "#c4704a");
+    p.rect(dx, 82, 62, 4, "#c98a4a");
+    p.rect(dx + 2, 86, 58, 22, "#8f5530");
+    p.rect(dx + 2, 86, 58, 1, "#6e3f22");
+    p.rect(dx + 6, 90, 50, 14, "#6e3f22");
   }
-  p.rect(18, 79, 10, 3, WHITE); p.rect(19, 77, 8, 2, "#ffe1ee"); // papers
-  p.rect(232, 79, 10, 3, WHITE); p.rect(233, 77, 8, 2, "#ffe1ee");
+  p.rect(18, 79, 10, 3, "#f6eedd"); p.rect(19, 77, 8, 2, "#d8cfbc"); // papers
+  p.rect(232, 79, 10, 3, "#f6eedd"); p.rect(233, 77, 8, 2, "#d8cfbc");
   // name plates
-  p.rect(30, 94, 22, 6, "#ff5c8a"); p.rect(204, 94, 22, 6, "#4fb3ff");
+  p.rect(30, 94, 22, 6, "#ff5d73"); p.rect(204, 94, 22, 6, "#5cc8ff");
   // witness stand
-  p.rect(106, 82, 44, 4, "#f6b27a");
-  p.rect(108, 86, 40, 18, "#9c5236");
-  p.rect(112, 90, 32, 10, "#d9825a");
-  p.rect(117, 92, 22, 6, "#3ddc97");
+  p.rect(106, 82, 44, 4, "#c98a4a");
+  p.rect(108, 86, 40, 18, "#6e3f22");
+  p.rect(112, 90, 32, 10, "#8f5530");
+  p.rect(117, 92, 22, 6, "#150f28");
+  p.rect(119, 94, 18, 2, "#7af0c4");
   return p.outline();
 }
 
 // The gavel, raised or down, drawn on the bench.
 export function gavel(up: boolean): Pix {
   const p = new Pix(14, 12);
-  p.rect(1, 10, 12, 2, "#9c5236");
-  if (up) { p.rect(5, 1, 7, 4, "#d9825a"); p.rect(2, 3, 4, 1, "#f6b27a"); }
-  else { p.rect(5, 5, 7, 4, "#d9825a"); p.rect(1, 7, 5, 1, "#f6b27a"); }
+  p.rect(1, 10, 12, 2, "#3a2214");
+  if (up) { p.rect(5, 1, 7, 4, "#8f5530"); p.rect(2, 3, 4, 1, "#c98a4a"); }
+  else { p.rect(5, 5, 7, 4, "#8f5530"); p.rect(1, 7, 5, 1, "#c98a4a"); }
   return p.outline();
 }

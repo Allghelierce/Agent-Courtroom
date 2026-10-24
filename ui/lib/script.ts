@@ -6,7 +6,7 @@ export type Line = {
   who: CastKey;
   mood: Mood;
   text: string;
-  burst?: { text: string; tone: "berry" | "sky" };
+  burst?: { text: string; tone: "red" | "blue" };
   cites?: number[];
   verdict?: boolean; // the ruling line: the stamp lands here
   moods: Partial<Record<"judge" | "pros" | "def" | "worker", Mood>>; // how everyone else looks during this line
@@ -49,7 +49,7 @@ export function buildScript(trial: Trial): Line[] {
     {
       who: "pros",
       mood: "angry",
-      burst: { text: "OBJECTION!", tone: "berry" },
+      burst: { text: "OBJECTION!", tone: "red" },
       text: trial.prosecution.argument,
       cites: trial.prosecution.cited_events,
       moods: { pros: "angry", worker: stuck, def: "worried" },
@@ -63,7 +63,7 @@ export function buildScript(trial: Trial): Line[] {
     {
       who: "def",
       mood: "shout",
-      burst: { text: "HOLD IT!", tone: "sky" },
+      burst: { text: "HOLD IT!", tone: "blue" },
       text: trial.defense.argument,
       cites: trial.defense.cited_events,
       moods: { def: "shout", worker: "worried", pros: "worried" },

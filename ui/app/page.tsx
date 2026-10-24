@@ -36,7 +36,7 @@ export default function Dashboard() {
         <Stat label="Agent spend" value={usd(agentSpend)} />
         <Stat label="Court spend" value={usd(courtSpend)} />
         <Stat label="Trials held" value={String(trials.length)} />
-        <span className="ml-auto text-sm text-ink-soft">{source === "live" ? "Live from the court server" : "Demo data (court server offline)"}</span>
+        <span className="ml-auto text-sm text-soft">{source === "live" ? "Live from the court server" : "Demo data (court server offline)"}</span>
       </section>
 
       <section aria-labelledby="workers-h" className="flex flex-col gap-4">
@@ -57,7 +57,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col">
       <span className="font-display text-[28px] leading-none">{value}</span>
-      <span className="text-sm text-ink-soft">{label}</span>
+      <span className="text-sm text-soft">{label}</span>
     </div>
   );
 }
@@ -65,11 +65,11 @@ function Stat({ label, value }: { label: string; value: string }) {
 function LatestCase({ trial }: { trial: Trial }) {
   return (
     <section className="px-box grid gap-6 p-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:p-6" aria-labelledby="latest-h">
-      <div className="self-start border-4 border-ink bg-[#b9a8ff]">
+      <div className="self-start border-4 border-edge bg-[#2a1d4a]">
         <CourtScene speaker="judge" moods={{ worker: trial.verdict.ruling === "continue" ? "happy" : "worried", pros: "angry", def: "neutral" }} swirl={trial.charge.kind === "looping"} workerLabel={trial.workerId} maxScale={4} />
       </div>
       <div className="flex flex-col justify-center gap-4">
-        <span className="text-sm text-ink-soft">Latest intervention, {clock(trial.finishedAt)}</span>
+        <span className="text-sm text-soft">Latest intervention, {clock(trial.finishedAt)}</span>
         <h1 id="latest-h" className="text-[28px]">
           {trial.workerId} was charged with {KIND_LABEL[trial.charge.kind].toLowerCase()}
         </h1>
@@ -80,7 +80,7 @@ function LatestCase({ trial }: { trial: Trial }) {
         </div>
         {trial.verdict.instruction && <p className="px-inset m-0 p-3 text-sm">{trial.verdict.instruction}</p>}
         <div>
-          <Link href={`/court/${trial.id}`} className="px-btn berry">
+          <Link href={`/court/${trial.id}`} className="px-btn red">
             <PixelIcon name="gavel" />
             Watch the trial
           </Link>
@@ -95,14 +95,14 @@ function WorkerCard({ worker: w, selected, onSelect }: { worker: WorkerView; sel
   const trial = w.trials.at(-1);
   const overBudget = w.spendUsd / w.budgetUsd;
   return (
-    <article className="px-box flex flex-col gap-4 p-4" style={selected ? { outline: "4px solid var(--lilac-deep)", outlineOffset: 4 } : undefined}>
-      <button type="button" onClick={onSelect} aria-pressed={selected} className="flex cursor-pointer items-start gap-3 border-0 bg-transparent p-0 text-left text-ink">
+    <article className="px-box flex flex-col gap-4 p-4" style={selected ? { outline: "4px solid var(--amber)", outlineOffset: 4 } : undefined}>
+      <button type="button" onClick={onSelect} aria-pressed={selected} className="flex cursor-pointer items-start gap-3 border-0 bg-transparent p-0 text-left text-text">
         <span className="px-inset shrink-0 p-1">
           <Chibi who="worker" mood={WORKER_MOOD[w.status]} scale={2} />
         </span>
         <span className="flex min-w-0 flex-col gap-1">
           <span className="font-display text-[20px] leading-none">{w.id}</span>
-          <span className="text-sm text-ink-soft">{w.repo}</span>
+          <span className="text-sm text-soft">{w.repo}</span>
           <StatusTag status={w.status} />
         </span>
       </button>
@@ -112,7 +112,7 @@ function WorkerCard({ worker: w, selected, onSelect }: { worker: WorkerView; sel
           <span>Tests passing</span>
           <span>{w.testsPassing} / {w.testsTotal}</span>
         </div>
-        <Meter value={w.testsPassing} max={w.testsTotal} color="var(--mint)" label={`${w.id} tests passing`} />
+        <Meter value={w.testsPassing} max={w.testsTotal} color="var(--green)" label={`${w.id} tests passing`} />
       </div>
 
       <div className="flex flex-col gap-1">
@@ -120,12 +120,12 @@ function WorkerCard({ worker: w, selected, onSelect }: { worker: WorkerView; sel
           <span>Spend</span>
           <span>{usd(w.spendUsd)} of {usd(w.budgetUsd)}</span>
         </div>
-        <Meter value={w.spendUsd} max={w.budgetUsd} cells={20} color={overBudget > 0.8 ? "var(--berry)" : "var(--gold)"} label={`${w.id} spend`} />
+        <Meter value={w.spendUsd} max={w.budgetUsd} cells={20} color={overBudget > 0.8 ? "var(--red)" : "var(--gold)"} label={`${w.id} spend`} />
       </div>
 
       <WarningLights lit={w.lights} />
 
-      {last && <p className="m-0 line-clamp-2 text-sm text-ink-soft">Last step: {describeEvent(last)}</p>}
+      {last && <p className="m-0 line-clamp-2 text-sm text-soft">Last step: {describeEvent(last)}</p>}
 
       {trial && (
         <Link href={`/court/${trial.id}`} className="px-btn ghost mt-auto justify-center">
@@ -162,7 +162,7 @@ function ActivityFeed({ workers, trials, only, onClear }: { workers: WorkerView[
     .toSorted((a, b) => b.at.localeCompare(a.at))
     .slice(0, 40);
 
-  const toneColor = { event: "var(--mint)", error: "var(--berry)", trial: "var(--gold)" };
+  const toneColor = { event: "var(--green)", error: "var(--red)", trial: "var(--gold)" };
 
   return (
     <section aria-labelledby="feed-h" className="flex flex-col gap-4">
@@ -178,16 +178,16 @@ function ActivityFeed({ workers, trials, only, onClear }: { workers: WorkerView[
       </div>
       <ol className="px-box m-0 flex max-h-[420px] list-none flex-col overflow-y-auto p-0">
         {rows.map((r, i) => (
-          <li key={r.key} className="flex items-start gap-3 px-4 py-2" style={{ background: i % 2 ? "var(--blush)" : undefined }}>
-            <span aria-hidden className="mt-1.5 inline-block size-3 shrink-0 border-2 border-ink" style={{ background: toneColor[r.tone] }} />
-            <span className="w-20 shrink-0 text-sm text-ink-soft">{clock(r.at)}</span>
+          <li key={r.key} className="flex items-start gap-3 px-4 py-2" style={{ background: i % 2 ? "var(--inset)" : undefined }}>
+            <span aria-hidden className="mt-1.5 inline-block size-3 shrink-0 border-2 border-edge" style={{ background: toneColor[r.tone] }} />
+            <span className="w-20 shrink-0 text-sm text-soft">{clock(r.at)}</span>
             <span className="w-24 shrink-0 text-sm">{r.worker}</span>
             {r.href ? (
               <Link href={r.href} className="min-w-0 text-sm underline decoration-2 underline-offset-4">
                 {r.text}
               </Link>
             ) : (
-              <span className="min-w-0 text-sm" style={{ color: r.tone === "error" ? "#b8264f" : undefined }}>
+              <span className="min-w-0 text-sm" style={{ color: r.tone === "error" ? "#ff8a9a" : undefined }}>
                 {r.text}
               </span>
             )}

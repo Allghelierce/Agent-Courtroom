@@ -2,52 +2,54 @@
 
 /* Tokens and shared pixel classes. The rules behind them are in ART.md. */
 :root {
-  --ink: #2d1b3d;
-  --ink-soft: #6b5a7e;
-  --paper: #fff7fb;
-  --blush: #ffe1ee;
-  --lilac: #c9bcff;
-  --lilac-check: #bfb0ff;
-  --lilac-deep: #9d8cff;
-  --gold: #ffc93c;
-  --berry: #ff5c8a;
-  --sky: #4fb3ff;
-  --mint: #3ddc97;
-  --wood: #f6b27a;
-  --wood-mid: #d9825a;
-  --wood-dark: #9c5236;
+  /* The palette from the original anime-pixel mockup. */
+  --bg: #0b0814;
+  --bg-check: #0e0a1a;
+  --panel: #1b1430;
+  --inset: #120c22;
+  --edge: #3b2f57;
+  --shadow: #000000;
+  --text: #f6eedd;
+  --soft: #b9aed0;
+  --on-accent: #120c22;
+  --gold: #f7c948;
+  --red: #ff5d73;
+  --blue: #5cc8ff;
+  --green: #7af0c4;
+  --amber: #ffb347;
   --px: 4px;
 }
 
 @theme inline {
-  --color-ink: var(--ink);
-  --color-ink-soft: var(--ink-soft);
-  --color-paper: var(--paper);
-  --color-blush: var(--blush);
-  --color-lilac: var(--lilac);
-  --color-lilac-deep: var(--lilac-deep);
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-inset: var(--inset);
+  --color-edge: var(--edge);
+  --color-text: var(--text);
+  --color-soft: var(--soft);
   --color-gold: var(--gold);
-  --color-berry: var(--berry);
-  --color-sky: var(--sky);
-  --color-mint: var(--mint);
+  --color-red: var(--red);
+  --color-blue: var(--blue);
+  --color-green: var(--green);
+  --color-amber: var(--amber);
   --font-display: var(--font-pixelify);
   --font-body: var(--font-dotgothic);
 }
 
 * { box-sizing: border-box; }
 
-html { color-scheme: light; }
+html { color-scheme: dark; }
 
 body {
   margin: 0;
-  color: var(--ink);
+  color: var(--text);
   font-family: var(--font-dotgothic), sans-serif;
   font-size: 16px;
   line-height: 1.5;
-  background-color: var(--lilac);
+  background-color: var(--bg);
   background-image:
-    linear-gradient(45deg, var(--lilac-check) 25%, transparent 25%, transparent 75%, var(--lilac-check) 75%),
-    linear-gradient(45deg, var(--lilac-check) 25%, transparent 25%, transparent 75%, var(--lilac-check) 75%);
+    linear-gradient(45deg, var(--bg-check) 25%, transparent 25%, transparent 75%, var(--bg-check) 75%),
+    linear-gradient(45deg, var(--bg-check) 25%, transparent 25%, transparent 75%, var(--bg-check) 75%);
   background-size: 16px 16px;
   background-position: 0 0, 8px 8px;
   -webkit-font-smoothing: none;
@@ -57,21 +59,21 @@ h1, h2, h3, .font-display { font-family: var(--font-pixelify), sans-serif; font-
 
 a { color: inherit; }
 
-:focus-visible { outline: var(--px) solid var(--lilac-deep); outline-offset: var(--px); }
+:focus-visible { outline: var(--px) solid var(--gold); outline-offset: var(--px); }
 
 canvas.pixelated { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
 
 /* The standard panel. */
 .px-box {
   position: relative;
-  background: var(--paper);
-  border: var(--px) solid var(--ink);
-  box-shadow: var(--px) var(--px) 0 0 var(--ink);
+  background: var(--panel);
+  border: var(--px) solid var(--edge);
+  box-shadow: var(--px) var(--px) 0 0 var(--shadow);
 }
 
 .px-inset {
-  background: var(--blush);
-  border: var(--px) solid var(--ink);
+  background: var(--inset);
+  border: var(--px) solid var(--edge);
 }
 
 .px-btn {
@@ -83,18 +85,18 @@ canvas.pixelated { image-rendering: pixelated; image-rendering: crisp-edges; dis
   font-size: 16px;
   line-height: 1;
   padding: 12px 16px;
-  color: var(--ink);
+  color: var(--on-accent);
   background: var(--gold);
-  border: var(--px) solid var(--ink);
-  box-shadow: 0 var(--px) 0 0 var(--ink);
+  border: var(--px) solid var(--shadow);
+  box-shadow: 0 var(--px) 0 0 #7a5a14;
   cursor: pointer;
   text-decoration: none;
   transform: translateY(0);
 }
 .px-btn:hover { filter: brightness(1.05); }
-.px-btn:active, .px-btn[aria-pressed="true"] { transform: translateY(var(--px)); box-shadow: 0 0 0 0 var(--ink); }
-.px-btn.ghost { background: var(--paper); }
-.px-btn.berry { background: var(--berry); color: var(--paper); }
+.px-btn:active, .px-btn[aria-pressed="true"] { transform: translateY(var(--px)); box-shadow: 0 0 0 0 #7a5a14; }
+.px-btn.ghost { background: var(--inset); color: var(--text); border-color: var(--edge); box-shadow: 0 var(--px) 0 0 var(--shadow); }
+.px-btn.red { background: var(--red); box-shadow: 0 var(--px) 0 0 #5a1426; }
 
 .px-tag {
   display: inline-flex;
@@ -105,7 +107,7 @@ canvas.pixelated { image-rendering: pixelated; image-rendering: crisp-edges; dis
   font-size: 12px;
   line-height: 1;
   padding: 6px 8px;
-  border: var(--px) solid var(--ink);
+  border: var(--px) solid var(--shadow);
   white-space: nowrap;
 }
 
@@ -119,15 +121,15 @@ canvas.pixelated { image-rendering: pixelated; image-rendering: crisp-edges; dis
   font-size: clamp(28px, 6vw, 64px);
   line-height: 1;
   padding: 0.6em 1.1em;
-  color: var(--paper);
-  text-shadow: var(--px) var(--px) 0 var(--ink);
+  color: #ffffff;
+  text-shadow: var(--px) var(--px) 0 #000000;
   pointer-events: none;
   transform: translate(-50%, -50%) rotate(-6deg) scale(0);
   clip-path: polygon(0% 18%, 12% 0%, 22% 14%, 36% 2%, 46% 16%, 60% 0%, 70% 15%, 84% 1%, 90% 20%, 100% 30%, 92% 48%, 100% 66%, 88% 78%, 94% 100%, 76% 88%, 62% 100%, 50% 86%, 36% 100%, 26% 86%, 10% 98%, 12% 78%, 0% 70%, 8% 50%, 0% 34%);
 }
 .burst.show { animation: burst-in 0.24s steps(4) forwards; }
-.burst.berry { background: var(--berry); }
-.burst.sky { background: var(--sky); }
+.burst.red { background: var(--red); }
+.burst.blue { background: #2f8fe0; }
 @keyframes burst-in {
   from { transform: translate(-50%, -50%) rotate(-6deg) scale(0); }
   to { transform: translate(-50%, -50%) rotate(-6deg) scale(1); }

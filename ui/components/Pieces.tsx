@@ -2,18 +2,16 @@ import type { ChargeKind, Ruling } from "@court/types";
 import { KIND_LABEL, RULING_COLOR, RULING_LABEL, STATUS_COLOR, STATUS_LABEL, type WorkerStatus } from "@/lib/data";
 
 export function StatusTag({ status }: { status: WorkerStatus }) {
-  const light = status === "halted" || status === "needs_human";
   return (
-    <span className={`px-tag ${status === "on_trial" ? "pulse-step" : ""}`} style={{ background: STATUS_COLOR[status], color: light ? "var(--paper)" : "var(--ink)" }}>
+    <span className={`px-tag ${status === "on_trial" ? "pulse-step" : ""}`} style={{ background: STATUS_COLOR[status], color: "var(--on-accent)" }}>
       {STATUS_LABEL[status]}
     </span>
   );
 }
 
 export function RulingTag({ ruling }: { ruling: Ruling }) {
-  const light = ruling === "halt" || ruling === "escalate";
   return (
-    <span className="px-tag" style={{ background: RULING_COLOR[ruling], color: light ? "var(--paper)" : "var(--ink)" }}>
+    <span className="px-tag" style={{ background: RULING_COLOR[ruling], color: "var(--on-accent)" }}>
       {RULING_LABEL[ruling]}
     </span>
   );
@@ -25,16 +23,16 @@ export function Meter({ value, max, cells = max, color, label }: { value: number
   return (
     <div role="meter" aria-label={label} aria-valuenow={value} aria-valuemin={0} aria-valuemax={max} className="flex gap-1">
       {Array.from({ length: cells }, (_, i) => (
-        <span key={i} className="h-3 flex-1 border-2 border-ink" style={{ background: i < filled ? color : "var(--blush)" }} />
+        <span key={i} className="h-3 flex-1 border-2 border-edge" style={{ background: i < filled ? color : "var(--inset)" }} />
       ))}
     </div>
   );
 }
 
 const LIGHTS: { kind: ChargeKind; color: string }[] = [
-  { kind: "looping", color: "var(--berry)" },
+  { kind: "looping", color: "var(--red)" },
   { kind: "stalling", color: "var(--gold)" },
-  { kind: "overspending", color: "var(--berry)" },
+  { kind: "overspending", color: "var(--red)" },
   { kind: "flailing", color: "var(--gold)" },
 ];
 
@@ -44,10 +42,10 @@ export function WarningLights({ lit }: { lit: ChargeKind[] }) {
       {LIGHTS.map(({ kind, color }) => {
         const on = lit.includes(kind);
         return (
-          <li key={kind} className="flex items-center gap-2 text-sm" style={{ color: on ? "var(--ink)" : "var(--ink-soft)" }}>
+          <li key={kind} className="flex items-center gap-2 text-sm" style={{ color: on ? "var(--text)" : "var(--soft)" }}>
             <span
               aria-hidden
-              className="inline-block size-3 border-2 border-ink"
+              className="inline-block size-3 border-2 border-edge"
               style={on ? { background: color, boxShadow: `0 0 0 4px color-mix(in srgb, ${color} 40%, transparent)` } : undefined}
             />
             {KIND_LABEL[kind]}

@@ -153,20 +153,20 @@ export const STATUS_LABEL: Record<WorkerStatus, string> = {
   halted: "Halted",
 };
 
-// Role colours carry meaning (ART.md): mint healthy, berry trouble, gold verdict, lilac human, ink-soft stopped.
+// Role colours carry meaning (ART.md): green healthy, red trouble, gold verdict, amber needs a human, soft stopped.
 export const STATUS_COLOR: Record<WorkerStatus, string> = {
-  working: "var(--mint)",
-  on_trial: "var(--berry)",
+  working: "var(--green)",
+  on_trial: "var(--red)",
   new_plan: "var(--gold)",
-  needs_human: "var(--lilac-deep)",
-  halted: "var(--ink-soft)",
+  needs_human: "var(--amber)",
+  halted: "var(--soft)",
 };
 
 export const RULING_COLOR: Record<Ruling, string> = {
-  continue: "var(--mint)",
+  continue: "var(--green)",
   change_strategy: "var(--gold)",
-  escalate: "var(--lilac-deep)",
-  halt: "var(--ink-soft)",
+  escalate: "var(--amber)",
+  halt: "var(--soft)",
 };
 
 export function usd(n: number): string {

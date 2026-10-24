@@ -1,0 +1,10 @@
+{
+  "name": "courtroom",
+  "description": "Agent Courtroom: cheap checks watch every tool call for looping, stalling, flailing and overspending; when one fires, a Prosecutor, a Defense and a Judge rule on what Claude should do next.",
+  "version": "0.1.0",
+  "author": { "name": "C0mpiled team" },
+  "homepage": "https://github.com/Allghelierce/C0mpiled",
+  "repository": "https://github.com/Allghelierce/C0mpiled",
+  "license": "MIT",
+  "keywords": ["supervision", "agents", "hooks", "cost", "safety"]
+}

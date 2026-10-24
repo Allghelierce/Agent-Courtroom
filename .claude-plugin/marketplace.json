@@ -1,0 +1,13 @@
+{
+  "name": "c0mpiled",
+  "description": "Agent Courtroom for Claude Code",
+  "owner": { "name": "C0mpiled team" },
+  "plugins": [
+    {
+      "name": "courtroom",
+      "description": "Cheap checks watch every tool call for looping, stalling, flailing and overspending; when one fires, a Prosecutor, a Defense and a Judge rule on what Claude should do next.",
+      "version": "0.1.0",
+      "source": "./plugin"
+    }
+  ]
+}

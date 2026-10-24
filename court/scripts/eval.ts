@@ -6,7 +6,9 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { costOf, holdTrial, JUDGE_MODEL, LAWYER_MODEL } from "../src/court.ts";
+import { costOf, holdTrial, modelsFor, resolveProvider } from "../src/court.ts";
+
+const { lawyer: LAWYER_MODEL, judge: JUDGE_MODEL } = modelsFor(resolveProvider() ?? "anthropic");
 import { buildPacket, fromEnginePacket } from "../src/packet.ts";
 import { renderPacket } from "../src/prompts.ts";
 import type { Charge, EnginePacket, Event, EvidencePacket, Ruling, Trial } from "../src/types.ts";
@@ -112,8 +114,8 @@ export function formatTotals(rows: Row[]): string {
 
 async function main(argv: string[]): Promise<number> {
   const stub = process.env.COURT_EVAL_STUB === "1";
-  if (!stub && !process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
-    console.log("eval needs ANTHROPIC_API_KEY set: it runs the real-model court and never falls back to the mock.");
+  if (!stub && resolveProvider() === null) {
+    console.log("eval needs ANTHROPIC_API_KEY (or GROQ_API_KEY) set: it runs the real-model court and never falls back to the mock.");
     return 0;
   }
 

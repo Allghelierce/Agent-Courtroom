@@ -13,7 +13,8 @@ const trial = await holdTrial(packet);   // full record for the UI and case log
 - **Prosecutor and Defense:** `claude-haiku-5-5`, run in parallel. Each must cite event IDs; IDs not in the packet are dropped.
 - **Judge:** `claude-opus-5-5`, returns the Verdict JSON from WORK_SPLIT.md. Server-side refusal fallbacks are on (`fallbacks: "default"`).
 - **Safety defaults:** if the Judge errors or refuses, the ruling is `escalate`. A `change_strategy` with no instruction also becomes `escalate`.
-- **Mock mode:** with no `ANTHROPIC_API_KEY` set (or `COURT_MOCK=1`), the court runs a deterministic mock and calls no model. `trial.mock` says which ran.
+- **Groq instead of Claude:** with `GROQ_API_KEY` set (and no Anthropic key), or `COURT_PROVIDER=groq`, the lawyers run on `openai/gpt-oss-20b` and the Judge on `openai/gpt-oss-120b`, using JSON-schema output checked against the same Zod schemas. Same safety defaults.
+- **Mock mode:** with no `ANTHROPIC_API_KEY` or `GROQ_API_KEY` set (or `COURT_MOCK=1`), the court runs a deterministic mock and calls no model. `trial.mock` says which ran.
 - Override models with `COURT_LAWYER_MODEL` / `COURT_JUDGE_MODEL`.
 
 ## Run

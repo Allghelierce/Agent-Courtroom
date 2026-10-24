@@ -68,5 +68,6 @@
     1,
     0.05
   ],
-  "groqNote": "Groq rows (gpt-oss-*) use Groq's listed input/output rates; cache fields repeat the input rate, matching the engine's conservative GroqBrain pricing."
+  "groqNote": "Standard list-price estimate before cache discounts or free-tier credits; not an invoice",
+  "groqSource": "https://console.groq.com/docs/models"
 }

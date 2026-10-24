@@ -47,8 +47,11 @@ class Bus:
                 except queue.Full:
                     # Reconnect from the durable cursor instead of retaining unbounded memory.
                     self._subscribers.remove(q)
-                    while not q.empty():
-                        q.get_nowait()
+                    while True:
+                        try:
+                            q.get_nowait()
+                        except queue.Empty:
+                            break
                     q.put_nowait(None)
             return message
 

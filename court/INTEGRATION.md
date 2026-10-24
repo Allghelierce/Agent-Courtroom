@@ -29,7 +29,7 @@ Send the engine's `EvidencePacket` from `shared/schema.ts`:
   "spend": {"costUsd": 0.31, "budgetUsd": 1.0}, "task": "Make the failing test suite pass" }
 ```
 
-The response body is a bare `Verdict`. The saved trial's ID comes back in the `X-Case-Id` header. A missing or mistyped field returns `400 {"error": "..."}`.
+The response body is a bare `Verdict`. The saved trial's ID comes back in the `X-Case-Id` header, and the IDs of any earlier trials shown to the Judge as precedent come back comma-separated in `X-Precedents`. Both routes feed the whole case log to the Judge as precedent. A missing or mistyped field returns `400 {"error": "..."}`.
 
 **From Python,** copy `clients/python/court_client.py` into the engine. It uses only the standard library.
 
@@ -82,4 +82,3 @@ While the court deliberates, the worker's state is `on_trial`. With the real mod
 - **The real-model path is untested end to end** without an API key. The tests cover it with a fake client, and `npm run eval` (`scripts/eval.ts`) runs the real court on every fixture once a key is set.
 - **`Charge.id` is optional here** but required in `shared/schema.ts`. Send it anyway, because the `verdict` stream message needs `chargeId`.
 - **`court/src/types.ts` mirrors `shared/schema.ts`** until that file lands on the `Tristan` branch. Then the court will import it directly.
-- **Precedent:** `holdTrial(packet, { past })` shows the Judge similar earlier trials. The committed HTTP routes don't pass `past` yet, so trials over HTTP get no precedent until the server is updated.

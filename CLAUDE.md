@@ -15,24 +15,61 @@ The top 5 projects will be picked to demo. Projects are judged in 3 areas, so ma
 - **Innovation**
 - **Real-world impact**
 
-## Project: Agent Courtroom, powered by TokenGuard
+## Project: Agent Courtroom
 
-We're merging TokenGuard and the Agent Courtroom, with the Price-Drop agent as the worker being supervised.
+> Status: brainstorming. Nothing here is locked in yet.
 
-- **TokenGuard is the evidence.** It handles cost tracking, repeated-call detection, and the free code-based monitors.
-- **The Courtroom is the decision-maker.** A Prosecutor, a Defense, and a Judge decide whether to continue, change strategy, switch to a cheaper model, escalate, or halt.
-- **The Price-Drop agent is the worker** being supervised in the demo.
+**Pitch:** "Agents don't need a babysitter. They need a judicial system."
 
-### Why this wins on all three criteria
+Hackathon prompt (c0mpiled-16, Unsupervised): build agents that run for hours without constant supervision. The system should know when it is stuck, overspending, looping, or needs to stop.
+
+### How it works
+
+A worker agent runs a long task in the background. Cheap monitors check every step for four warning signs:
+
+- **Looping:** repeating the same action or tool call.
+- **Overspending:** cost climbing faster than progress.
+- **Stalling:** no new progress (passing tests, files, facts) in N steps.
+- **Flailing:** repeated errors or "let me try another approach" retries.
+
+The monitors are plain code with no LLM calls, so watching is nearly free. When one fires, court convenes:
+
+- **Prosecutor** argues the worker is stuck or wasting money.
+- **Defense** argues it's making real progress and should continue.
+- **Judge** rules: **continue**, **change strategy** (with a specific new instruction), **pause and escalate to a human**, or **halt**.
+
+Every case and verdict is saved to a readable log, so someone coming back hours later can see exactly what happened and why.
+
+### Key design choices
+
+- Court only convenes when a monitor fires, so the oversight layer doesn't overspend either.
+- Prosecutor and Defense argue from logs and metrics (action history, spend vs. budget, progress, error counts), not from the worker's own story. That stops the debate from collapsing into the agents agreeing with each other.
+- Cheap models for Prosecutor and Defense, a stronger model for the Judge.
+
+### The worker: a coding agent fixing a failing repo (proposed)
+
+The worker gets a small repo with a failing test suite and tries to make it pass.
+
+- **Progress is easy to measure:** tests passing out of total. That gives the monitors and the lawyers hard evidence.
+- **Looping happens naturally:** coding agents really do edit the same file and rerun the same tests over and over.
+- **Judges get it right away:** they're developers who have watched an AI coding tool burn tokens going in circles.
+- **The trap:** one test depends on an unreachable API (or is impossible as written). The worker loops on it, court convenes, and the Judge rules "change strategy: mock the API / skip that test and flag it for a human." The worker finishes the rest.
+
+Other workers we considered: a price-drop tracker on mock store pages, a research-report compiler, and a messy-data scraper. The courtroom should stay worker-agnostic so any of these can plug in later.
+
+### Why this wins on the judging criteria
 
 - **Innovation:** the courtroom is memorable and unlike what other teams will build.
-- **Scalability:** cheap code monitors plus court only on demand means it can oversee many agents. Show 3–5 workers running at once.
-- **Real-world impact:** a relatable everyday worker (price tracking) makes it concrete, and the with/without cost comparison gives judges real numbers.
+- **Scalability:** cheap code monitors plus court only on demand means one courtroom can oversee many agents. Show 3–5 workers running at once.
+- **Real-world impact:** runaway agents waste real money. A with/without comparison gives judges real numbers.
 
 ### Demo flow
 
-Several price-watching agents run. One hits a broken store page and starts looping. TokenGuard flags the rising cost, court convenes, and the Judge rules "switch to backup store and a cheaper model." The agent recovers. Then show the comparison: cost, time, and success with vs. without.
+1. Several workers run, each on its own repo. The screen shows a live activity feed, a cost meter, and warning lights.
+2. One worker hits the trap and starts looping. The monitor fires and the courtroom transcript pops up.
+3. Prosecutor, Defense, and Judge argue from the logs. The Judge rules "change strategy." The worker recovers.
+4. Show the same run with and without the courtroom: total cost, time to completion, and whether the task succeeded.
 
-### Keep it doable
+### UI mockup
 
-The price worker can run on mock store pages we control, which keeps the build within 6 hours.
+Pixel-art courtroom draft: https://claude.ai/artifact/YbpiWve6SgVTkYuexMZMpV (private until shared). It currently shows the price-watcher worker; update it if the coding worker sticks.

@@ -7,3 +7,6 @@ node_modules/
 .env
 .env.local
 .env.*.local
+*.pyc
+engine/.venv/
+runs/

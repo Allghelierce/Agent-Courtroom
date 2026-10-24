@@ -1,1 +1,2 @@
 anthropic>=1.0
+groq>=0.30

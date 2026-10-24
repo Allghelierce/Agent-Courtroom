@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 from . import monitors
-from .brains import ClaudeBrain, ScriptedBrain
+from .brains import DEFAULT_MODELS, ClaudeBrain, GroqBrain, ScriptedBrain
 from .bus import Bus
 from .court import HttpCourt, StubCourt
 from .tasks import TASKS, Task
@@ -24,9 +24,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 @dataclass
 class RunConfig:
     task: str = "coding"  # a key of tasks.TASKS
-    brain: str = "scripted"  # "scripted" or "claude"
+    brain: str = "scripted"  # "scripted", "claude", or "groq"
     court: str = "stub"  # "stub", "none", or the URL of Person B's convene endpoint
-    model: str = "claude-opus-5-5"
+    model: Optional[str] = None  # defaults per brain, see brains.DEFAULT_MODELS
     budget_usd: float = 2.0
     max_steps: int = 60
     all_monitors: bool = False
@@ -34,11 +34,11 @@ class RunConfig:
     seed: Optional[Path] = None  # defaults to the task's own seed
 
     def validate(self) -> None:
-        if not isinstance(self.task, str) or not isinstance(self.model, str) or not self.model:
-            raise ValueError("task and model must be strings")
+        if not isinstance(self.task, str) or (self.model is not None and (not isinstance(self.model, str) or not self.model)):
+            raise ValueError("task must be a string and model must be a nonempty string or omitted")
         get_task(self.task)
-        if self.brain not in ("scripted", "claude"):
-            raise ValueError("brain must be scripted or claude")
+        if self.brain not in DEFAULT_MODELS:
+            raise ValueError("brain must be scripted, claude, or groq")
         if isinstance(self.budget_usd, bool) or not isinstance(self.budget_usd, (int, float)) or not math.isfinite(self.budget_usd) or self.budget_usd <= 0:
             raise ValueError("budgetUsd must be a positive finite number")
         if type(self.max_steps) is not int or not 1 <= self.max_steps <= 10000:
@@ -58,10 +58,15 @@ def get_task(name: str) -> Task:
 
 
 def make_brain(cfg: RunConfig, task: Task):
+    if cfg.brain not in DEFAULT_MODELS:
+        raise ValueError(f"unknown brain: {cfg.brain}")
+    model = cfg.model or DEFAULT_MODELS[cfg.brain]
     if cfg.brain == "claude":
-        return ClaudeBrain(task, model=cfg.model)
+        return ClaudeBrain(task, model=model)
+    if cfg.brain == "groq":
+        return GroqBrain(task, model=model)
     if cfg.brain == "scripted":
-        return ScriptedBrain(task, model=cfg.model, step_delay=cfg.step_delay)
+        return ScriptedBrain(task, model=model, step_delay=cfg.step_delay)
     raise ValueError(f"unknown brain: {cfg.brain}")
 
 
@@ -159,7 +164,7 @@ class Engine:
             "createdAt": datetime.now(timezone.utc).isoformat(),
             "task": cfg.task,
             "brain": cfg.brain,
-            "model": cfg.model,
+            "model": cfg.model or DEFAULT_MODELS[cfg.brain],
             "court": cfg.court,
             "budgetUsd": cfg.budget_usd,
             "maxSteps": cfg.max_steps,

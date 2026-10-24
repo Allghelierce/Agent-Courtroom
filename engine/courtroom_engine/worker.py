@@ -12,7 +12,7 @@ from . import monitors
 from .bus import Bus
 from .court import Court, build_packet
 from .schema import Charge, Event, Verdict, WorkerStatus
-from .tasks import Env, Task
+from .tasks import Env, Task, ToolOutcome
 from .costs import PRICES
 
 HUMAN_WAIT_SECONDS = 600
@@ -120,7 +120,7 @@ class Worker:
             self._publish_status()
             self._loop(env)
         except Exception as e:  # a crashed worker should still end its run cleanly
-            if self.brain_mode == "claude":
+            if self.brain_mode != "scripted":
                 self.status.workerCostComplete = False
             self._finish("failed", f"Worker crashed: {type(e).__name__}: {e}")
         finally:
@@ -151,7 +151,10 @@ class Worker:
                     return self._finish("succeeded", f"Finished at {self._score()}. {action.text}".strip())
                 return self._finish("failed", f"Worker stopped at {self._score()}: {action.text}".strip())
 
-            outcome = env.execute(action.tool, action.args)
+            if action.error:
+                outcome = ToolOutcome(output=action.error, summary=action.error, error=action.error)
+            else:
+                outcome = env.execute(action.tool, action.args)
             if outcome.progress:
                 self.status.testsPassing, self.status.testsTotal = outcome.progress
             self.status.step += 1
@@ -183,7 +186,7 @@ class Worker:
                     return self._finish("halted", f"Court halted the run at {self._score()}: {verdict.reasoning}")
                 if verdict.ruling == "change_strategy":
                     instruction = verdict.instruction
-            self.brain.observe(outcome.output, outcome.error is not None, instruction)
+            self.brain.observe(outcome.output, outcome.error is not None, instruction, summary=outcome.summary)
 
     def _check_monitors(self) -> Optional[Verdict]:
         finding = monitors.check(self.events[self.window_start :], self.budget_usd, self.enabled_monitors)

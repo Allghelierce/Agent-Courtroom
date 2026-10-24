@@ -91,7 +91,7 @@ export type ComparisonResult = {
   id: string;
   createdAt: string;
   task: string;
-  brain: "scripted" | "claude";
+  brain: "scripted" | "claude" | "groq";
   model: string;
   court: string;
   budgetUsd: number;

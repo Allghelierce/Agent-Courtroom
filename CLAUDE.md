@@ -108,6 +108,25 @@ Four parts, each one small enough for one person to own:
 - Should the with/without comparison run live or be pre-recorded? Live is riskier but more convincing.
 - Do we name the agents (a judge character, etc.) for the courtroom scene, or keep them generic?
 
+### Team split
+
+**Person A: the engine (worker, monitors, seed repo)**
+
+- **Seed repo:** a small project with a failing test suite plus the trap test that depends on an unreachable API.
+- **Worker runner:** the tool loop (read, edit, run tests) on a sandboxed copy of the seed repo. Writes one event per step: tool call, arguments, token cost, tests passing, and any error.
+- **Monitors:** looping and stalling for the MVP; overspending and flailing are stretch goals. Each returns a charge when it fires.
+- **Control hooks:** pause the worker when a charge is filed, then act on the verdict: inject the instruction into the next prompt on `change_strategy`, wait for a human on `escalate`, end the run on `halt`.
+- **With/without comparison:** the same run with and without the courtroom, measuring cost, time, and whether the tests passed.
+
+**Person B: the court and the UI (Tristan)**
+
+- **Courtroom:** builds the evidence packet from a charge, runs the Prosecutor and Defense prompts (each must cite event IDs), then the Judge prompt, which returns the structured verdict.
+- **Dashboard:** the worker grid, with status, tests passing, cost meter, and warning lights.
+- **Courtroom scene:** plays the trial transcript as dialogue. Adapt the existing pixel-art mockup, which still shows the price watcher.
+- **Case log:** a page listing every trial so someone can audit what happened.
+
+**The contract between A and B** is the event log, the charge, and the verdict JSON above. Agree on those shapes first so both sides can build against mocks.
+
 ### UI mockup
 
 Pixel-art courtroom draft: https://claude.ai/artifact/YbpiWve6SgVTkYuexMZMpV (private until shared). It currently shows the price-watcher worker; update it if the coding worker sticks.

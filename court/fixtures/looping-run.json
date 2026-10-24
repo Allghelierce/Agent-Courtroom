@@ -12,7 +12,7 @@
       "testsPassing": 3,
       "testsTotal": 12,
       "timestamp": "2026-10-24T22:00:00Z",
-      "result": "3/12 passing; failing: test_cache_ttl, test_convert_eur_usd, test_convert_usd_eur, test_cross_rate, test_fetch_rates, test_inverse_rate, test_reject_unknown_currency, test_round_jpy, test_round_usd"
+      "result": "3/12 passing; failing: test_cache_ttl, test_convert_eur_usd, test_convert_usd_eur, test_cross_rate, test_fetch_rates, test_inverse_rate, test_reject_unknown_currency, test_round_jpy, test_round_usd — AssertionError: expected a fresh fetch after the 60000 ms TTL, got the cached rate"
     },
     {
       "id": 2,
@@ -57,7 +57,7 @@
       "testsPassing": 6,
       "testsTotal": 12,
       "timestamp": "2026-10-24T22:01:00Z",
-      "result": "6/12 passing; failing: test_cache_ttl, test_cross_rate, test_fetch_rates, test_reject_unknown_currency, test_round_jpy, test_round_usd"
+      "result": "6/12 passing; failing: test_cache_ttl, test_cross_rate, test_fetch_rates, test_reject_unknown_currency, test_round_jpy, test_round_usd — AssertionError: expected a fresh fetch after the 60000 ms TTL, got the cached rate"
     },
     {
       "id": 5,
@@ -102,7 +102,7 @@
       "testsPassing": 8,
       "testsTotal": 12,
       "timestamp": "2026-10-24T22:02:00Z",
-      "result": "8/12 passing; failing: test_cache_ttl, test_cross_rate, test_fetch_rates, test_reject_unknown_currency"
+      "result": "8/12 passing; failing: test_cache_ttl, test_cross_rate, test_fetch_rates, test_reject_unknown_currency — AssertionError: expected a fresh fetch after the 60000 ms TTL, got the cached rate"
     },
     {
       "id": 8,
@@ -164,7 +164,7 @@
       "testsPassing": 11,
       "testsTotal": 12,
       "timestamp": "2026-10-24T22:03:20Z",
-      "result": "11/12 passing; failing: test_fetch_rates"
+      "result": "11/12 passing; failing: test_fetch_rates — Error: connect ECONNREFUSED api.rates.example:443"
     },
     {
       "id": 12,
@@ -194,7 +194,7 @@
       "testsPassing": 11,
       "testsTotal": 12,
       "timestamp": "2026-10-24T22:04:00Z",
-      "result": "11/12 passing; failing: test_fetch_rates"
+      "result": "11/12 passing; failing: test_fetch_rates — Error: connect ECONNREFUSED api.rates.example:443"
     },
     {
       "id": 14,
@@ -224,14 +224,14 @@
       "testsPassing": 11,
       "testsTotal": 12,
       "timestamp": "2026-10-24T22:04:40Z",
-      "result": "11/12 passing; failing: test_fetch_rates"
+      "result": "11/12 passing; failing: test_fetch_rates — Error: connect ECONNREFUSED api.rates.example:443"
     }
   ],
   "charge": {
     "id": 1,
     "workerId": "worker-03",
     "kind": "looping",
-    "summary": "run_tests({}) repeated 3 times in the last 10 steps with the same result: 11/12 passing; failing: test_fetch_rates",
+    "summary": "run_tests({}) repeated 3 times in the last 10 steps with the same result: 11/12 passing; failing: test_fetch_rates — Error: connect ECONNREFUSED api.rates.example:443",
     "eventIds": [
       11,
       13,

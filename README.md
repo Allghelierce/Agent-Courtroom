@@ -79,6 +79,13 @@ Each task runs with and without the court, using the same worker configuration. 
 - Scripted costs are simulated, and "completed" is the engine's own report, not independently verified success.
 - With real workers, the benchmark also needs your `--success-criteria` text from [docs/decisions.md](docs/decisions.md). It records the rule but doesn't verify it automatically.
 
+## Stripe sandbox integration
+
+To test a functioning payment API, follow [the Stripe sandbox guide](docs/stripe-sandbox.md).
+It uses test credentials, checks successful and declined payments, verifies the
+payment with Stripe, and tests connection-failure handling. It is separate from
+the worker benchmark and does not move money.
+
 ## Tests
 
 ```sh

@@ -10,7 +10,7 @@ import { Chibi } from "@/components/Sprites";
 import { CHARGE_PHRASE, KIND_LABEL, RULING_LABEL, STATE_LABEL, clock, describeEvent, usd, type Charge, type Ruling, type Trial } from "@/lib/data";
 import { useLive, type FeedItem, type LiveWorker } from "@/lib/live";
 import type { Mood } from "@/lib/sprites";
-import { runCosts, savings, type ComparisonResult, type WorkerResult, type WorkerState } from "@/lib/stream";
+import { DEMO_TRIALS, runCosts, savings, type ComparisonResult, type WorkerResult, type WorkerState } from "@/lib/stream";
 
 export default function Dashboard() {
   const live = useLive();
@@ -63,6 +63,16 @@ export default function Dashboard() {
 
 // ---------- court in session ----------
 
+// The courtroom scene is a way in: clicking it opens the trial, like zooming into the court.
+function SceneLink({ href, children }: { href?: string; children: React.ReactNode }) {
+  if (!href) return <div className="self-start">{children}</div>;
+  return (
+    <Link href={href} className="block self-start hover:brightness-110" aria-label="Open the courtroom" title="Open the courtroom">
+      {children}
+    </Link>
+  );
+}
+
 function evidenceLabel(ids: number[]): string {
   if (ids.length <= 3) return ids.map((n) => `#${n}`).join(", ");
   return `${ids.length} events`;
@@ -81,9 +91,9 @@ function InSession({ charge, trial, others }: { charge: Charge; trial?: Trial; o
 
   return (
     <section className="px-box grid grid-cols-[minmax(0,1fr)] gap-6 p-4 md:p-6 lg:grid-cols-[520px_minmax(0,1fr)]" style={{ borderColor: "var(--red)" }} aria-labelledby="session-h" aria-live="polite">
-      <div className="self-start">
+      <SceneLink href={trial && `/court/${trial.id}`}>
         <FramedScene speaker={TURNS[turn]} moods={{ pros: "angry", def: "shout", worker: looping ? "dizzy" : "worried" }} swirl={looping} workerLabel={charge.workerId} maxScale={2} />
-      </div>
+      </SceneLink>
       <div className="flex flex-col justify-center gap-4">
         <span className="px-tag pulse-step self-start" style={{ background: "var(--red)", color: "var(--on-accent)" }}>
           Court is in session
@@ -118,9 +128,9 @@ function InSession({ charge, trial, others }: { charge: Charge; trial?: Trial; o
 function LatestCase({ trial }: { trial: Trial }) {
   return (
     <section className="px-box grid grid-cols-[minmax(0,1fr)] gap-6 p-4 md:p-6 lg:grid-cols-[520px_minmax(0,1fr)]" aria-labelledby="latest-h">
-      <div className="self-start">
+      <SceneLink href={`/court/${trial.id}`}>
         <FramedScene speaker="judge" moods={{ worker: trial.verdict.ruling === "halt" ? "worried" : "happy", pros: "angry", def: "neutral" }} swirl={false} workerLabel={trial.workerId} maxScale={2} />
-      </div>
+      </SceneLink>
       <div className="flex flex-col justify-center gap-4">
         <span className="text-sm text-soft">Latest intervention</span>
         <h1 id="latest-h" className="text-[40px]">
@@ -155,17 +165,34 @@ function LatestCase({ trial }: { trial: Trial }) {
   );
 }
 
+// The courtroom is always one click away: the recorded looping trial is the clearest example of what the court does.
+const SAMPLE_TRIAL = DEMO_TRIALS.find((t) => t.verdict.ruling === "change_strategy") ?? DEMO_TRIALS[0];
+
 function QuietCourt() {
+  const live = useLive();
   return (
     <section className="px-box grid grid-cols-[minmax(0,1fr)] gap-6 p-4 md:p-6 lg:grid-cols-[520px_minmax(0,1fr)]" aria-labelledby="quiet-h">
-      <div className="self-start">
+      <SceneLink href={SAMPLE_TRIAL && `/court/${SAMPLE_TRIAL.id}`}>
         <FramedScene speaker={null} moods={{ worker: "happy", judge: "happy" }} workerLabel="a worker" maxScale={2} />
-      </div>
+      </SceneLink>
       <div className="flex flex-col justify-center gap-4">
         <h1 id="quiet-h" className="text-[40px]">The court is waiting</h1>
         <p className="m-0">
           Cheap code monitors check every step each worker takes. Court only convenes when one of them flags a worker that is looping, stuck, overspending, or flailing.
         </p>
+        <div className="flex flex-wrap gap-3">
+          {SAMPLE_TRIAL && (
+            <Link href={`/court/${SAMPLE_TRIAL.id}`} className="px-btn red">
+              <PixelIcon name="gavel" />
+              Watch a sample trial
+            </Link>
+          )}
+          {(live.source === "live" || live.source === "disconnected") && (
+            <button type="button" className="px-btn ghost" onClick={live.playDemo}>
+              Play the recorded demo
+            </button>
+          )}
+        </div>
       </div>
     </section>
   );
@@ -179,7 +206,7 @@ function RunStatus() {
     connecting: "Connecting to the engine...",
     live: "Live from the engine",
     disconnected: "Disconnected from the engine, showing the last data received",
-    replay: "Demo replay of a recorded run",
+    replay: live.demoChosen ? "Recorded demo (the engine is running)" : "Demo replay of a recorded run",
   }[live.source];
   const dot = { connecting: "var(--soft)", live: "var(--green)", disconnected: "var(--amber)", replay: "var(--blue)" }[live.source];
 
@@ -190,6 +217,11 @@ function RunStatus() {
         {label}
         {live.source === "replay" ? `, ${Math.round(live.progress * 100)}%` : ""}
       </span>
+      {(live.source === "live" || live.source === "disconnected") && (
+        <button type="button" className="px-btn sm ghost" onClick={live.playDemo}>
+          Play the recorded demo
+        </button>
+      )}
       {live.source === "replay" && (
         <div className="flex flex-wrap gap-2">
           <button type="button" className="px-btn sm ghost" onClick={() => live.setPlaying(!live.playing)}>
@@ -203,6 +235,11 @@ function RunStatus() {
           <button type="button" className="px-btn sm ghost" onClick={live.restart}>
             Restart
           </button>
+          {live.demoChosen && (
+            <button type="button" className="px-btn sm" onClick={live.goLive}>
+              Back to the live engine
+            </button>
+          )}
         </div>
       )}
     </div>

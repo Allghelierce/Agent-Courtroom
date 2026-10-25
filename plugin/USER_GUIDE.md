@@ -125,7 +125,7 @@ Set any of these before starting Claude Code, for example `COURTROOM_BUDGET_USD=
 
 **Port 4300 is busy.** Start with `COURTROOM_PORT=4301`. If you use the dashboard, change its URLs to match.
 
-**The dashboard shows a demo instead of my session.** The dashboard has to be started with the two `NEXT_PUBLIC_..._URL` settings from step 6.
+**The dashboard shows a demo instead of my session.** It shows the demo until Courtroom starts, then switches to your sessions within a few seconds. If it stays on the demo while `curl -s localhost:4300/health` answers, the dashboard wasn't started with the two `NEXT_PUBLIC_..._URL` settings from step 6: stop it and start it again with them.
 
 **Something else.** Look at `~/.claude-courtroom/daemon.log`.
 

@@ -36,6 +36,7 @@ type RunState = {
 
 const EMPTY: RunState = { workers: {}, order: [], feed: [], openCharges: [], verdicts: [], trials: {}, lastAt: "", lastSequence: 0, seq: 0 };
 const FEED_MAX = 200;
+const RETRY_MS = 5000; // while the engine's stream is down, look for it this often
 
 function apply(state: RunState, msg: StreamMessage | { type: "reset" }): RunState {
   if (msg.type === "reset") return EMPTY;
@@ -170,42 +171,47 @@ export function LiveProvider({ children }: { children: ReactNode }) {
   const [demoChosen, setDemoChosen] = useState(false);
   const courtCases = useCourtCases();
 
-  // Try the engine's stream first; fall back to the bundled replay if it isn't up. A viewer who picks the recorded
-  // demo skips the engine entirely until they go back to it.
+  // Try the engine's stream first; fall back to the bundled replay if it isn't up, and keep looking for it: the Claude
+  // Code plugin only starts its daemon when a session does, often after this page has loaded. A viewer who picks the
+  // recorded demo skips the engine entirely until they go back to it.
   useEffect(() => {
     if (demoChosen) return;
-    const es = new EventSource(`${ENGINE_URL}/stream`);
+    let es: EventSource | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     let opened = false;
-    const timer = setTimeout(() => {
-      if (opened) return;
-      es.close();
-      setSource("replay");
-    }, 1500);
-    es.onopen = () => {
-      if (!opened) dispatch({ type: "reset" });
-      opened = true;
-      clearTimeout(timer);
-      setSource("live");
+    const connect = () => {
+      const current = new EventSource(`${ENGINE_URL}/stream`);
+      es = current;
+      const retry = () => {
+        clearTimeout(timer);
+        current.close();
+        if (!opened) setSource("replay"); // once live, keep showing the last data received
+        timer = setTimeout(connect, RETRY_MS);
+      };
+      timer = setTimeout(retry, 1500);
+      current.onopen = () => {
+        if (!opened) dispatch({ type: "reset" }); // drop the replay for the real thing
+        opened = true;
+        clearTimeout(timer);
+        setSource("live");
+      };
+      current.onmessage = (e) => {
+        try {
+          dispatch(JSON.parse(e.data) as StreamMessage);
+        } catch {
+          // ignore a malformed line
+        }
+      };
+      current.onerror = () => {
+        if (!opened) return retry();
+        setSource("disconnected"); // EventSource keeps retrying and onopen flips this back, unless it gives up
+        if (current.readyState === EventSource.CLOSED) retry();
+      };
     };
-    es.onmessage = (e) => {
-      try {
-        dispatch(JSON.parse(e.data) as StreamMessage);
-      } catch {
-        // ignore a malformed line
-      }
-    };
-    es.onerror = () => {
-      if (opened) {
-        setSource("disconnected"); // EventSource keeps retrying; onopen flips this back
-        return;
-      }
-      clearTimeout(timer);
-      es.close();
-      setSource("replay");
-    };
+    connect();
     return () => {
       clearTimeout(timer);
-      es.close();
+      es?.close();
     };
   }, [demoChosen]);
 

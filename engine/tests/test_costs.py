@@ -79,6 +79,23 @@ class CostTests(unittest.TestCase):
         RunConfig(brain="groq", model="openai/gpt-oss-20b").validate()
         RunConfig(brain="scripted", model="claude-haiku-5-5").validate()
 
+    def test_unparseable_model_output_is_a_failed_step_not_an_unlogged_crash(self):
+        def create(**kw):
+            raise BadRequest("Parsing failed", {"error": {"code": "output_parse_failed"}})
+        with self._groq(create):
+            brain = GroqBrain(get_task("checkout-v2"), model="openai/gpt-oss-20b")
+            action = brain.next_action()
+            brain.observe(action.error, True)
+        self.assertEqual(action.tool, "invalid_tool_call")
+        self.assertFalse(action.cost_complete)
+        self.assertIn("valid tool call", brain.messages[-1]["content"])
+
+    def test_unrelated_bad_request_still_stops_the_run(self):
+        def create(**kw):
+            raise BadRequest("Invalid model", {"error": {"code": "invalid_model"}})
+        with self._groq(create), self.assertRaises(BadRequest):
+            GroqBrain(get_task("prices")).next_action()
+
     def test_invalid_brain_is_a_validation_error(self):
         with self.assertRaises(ValueError):
             RunConfig(brain=[]).validate()

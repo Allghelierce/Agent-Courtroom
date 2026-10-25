@@ -172,7 +172,10 @@ class GroqBrain:
         except self.groq.BadRequestError as e:
             # Groq rejects tool calls the model wrote as invalid JSON. Log it as a failed step so
             # the flailing monitor can see a model that keeps doing it.
-            if "tool_use_failed" not in str(e):
+            body = getattr(e, "body", None)
+            error = body.get("error", body) if isinstance(body, dict) else {}
+            code = error.get("code") if isinstance(error, dict) else None
+            if code not in ("tool_use_failed", "output_parse_failed") and "tool_use_failed" not in str(e):
                 raise
             self._pending = None
             return self._failed_call(e, request)

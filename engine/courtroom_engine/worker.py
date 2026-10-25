@@ -51,6 +51,7 @@ class Worker:
         self.keep_env = keep_env
         self.evidence_dir = evidence_dir
         self.evidence_error = None
+        self.verification = None
         self.human_wait_seconds = human_wait_seconds
         self.events: list[Event] = []
         self.window_start = 0  # monitors only see events after the last ruling
@@ -101,7 +102,10 @@ class Worker:
                 "caseIds": sorted(self.case_ids), "courtModes": sorted(self.court_modes),
                 "outcomeVerified": False,
                 "evidencePath": str(self.evidence_dir) if self.evidence_dir else None,
-                "evidenceError": self.evidence_error}
+                "evidenceError": self.evidence_error,
+                **({"recoveryChecks": self.verification["recoveryChecks"],
+                    "stripeChecks": self.verification["stripeChecks"]}
+                   if self.verification and "recoveryChecks" in self.verification else {})}
 
     def cancel(self) -> None:
         self._cancelled.set()
@@ -136,7 +140,7 @@ class Worker:
             if env is not None:
                 try:
                     if self.evidence_dir:
-                        capture(env, self.seed, self.evidence_dir, self.task.name)
+                        self.verification = capture(env, self.seed, self.evidence_dir, self.task.name)
                 except Exception as exc:
                     self.evidence_error = f"{type(exc).__name__}: {exc}"
                     self.bus.publish("evidence_error", {"workerId": self.id, "error": self.evidence_error})

@@ -72,8 +72,9 @@ function accounting(model: string, usage: Usage) {
   return { costUsd: cost ?? 0, costComplete: cost !== null };
 }
 
-// The engine gives up on the court after 60s, so a whole trial must finish well inside that.
-const DEADLINE_MS = envNum("COURT_DEADLINE_MS", 50_000, 1);
+// One two-minute deadline covers both lawyers, the judge, and provider retries.
+// The engine waits 130s, allowing this server time to return its final verdict.
+const DEADLINE_MS = envNum("COURT_DEADLINE_MS", 120_000, 1);
 
 const ArgumentSchema = z.object({
   argument: z.string(),
@@ -118,8 +119,8 @@ function backend(opts: CourtOptions): { ask: Ask; models: { lawyer: string; judg
     ask:
       provider === "groq"
         ? // The free tier rate-limits; the SDK backs off and retries inside the trial deadline.
-          groqAsk(opts.groq ?? new Groq({ maxRetries: 3, timeout: 25_000 }), models)
-        : anthropicAsk(opts.client ?? new Anthropic({ maxRetries: 0, timeout: 60_000 }), models),
+          groqAsk(opts.groq ?? new Groq({ maxRetries: 3, timeout: DEADLINE_MS }), models)
+        : anthropicAsk(opts.client ?? new Anthropic({ maxRetries: 0, timeout: DEADLINE_MS }), models),
   };
 }
 

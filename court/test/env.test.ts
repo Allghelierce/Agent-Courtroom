@@ -122,7 +122,7 @@ function trialWithDeadline(value: string) {
   return JSON.parse(res.stdout.trim().split("\n").at(-1)!) as { prosecution: string; ruling: string };
 }
 
-test("blank, zero, or junk COURT_DEADLINE_MS falls back to the 50s default instead of aborting at once", () => {
+test("blank, zero, or junk COURT_DEADLINE_MS falls back to the 120s default instead of aborting at once", () => {
   for (const value of ["", "   ", "0", "abc"]) {
     const t = trialWithDeadline(value);
     assert.equal(t.prosecution, "It loops.", `COURT_DEADLINE_MS=${JSON.stringify(value)} cut the trial short`);

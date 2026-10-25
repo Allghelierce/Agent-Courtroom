@@ -136,6 +136,6 @@ Everything stays on your computer, in `~/.claude-courtroom/`:
 - `stream.jsonl` is the activity log.
 - `cases/` holds one file per trial.
 
-Only web pages on your own machine (localhost) can read it. To start fresh, quit Claude Code, stop the background process with `pkill -f courtroom.*daemon.mjs`, and delete that folder.
+Only web pages on your own machine (localhost) can read it. To start fresh, quit Claude Code, stop the background process with `lsof -ti tcp:4300 | xargs kill`, and delete that folder.
 
 If you set an API key, the court sends the evidence for each trial to that provider: the recent steps, which include commands and file paths.

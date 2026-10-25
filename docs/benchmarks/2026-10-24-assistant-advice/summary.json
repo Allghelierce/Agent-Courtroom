@@ -1,0 +1,15 @@
+{
+  "state": "succeeded",
+  "modelTurns": 20,
+  "summary": "Finished at 20/20 done after 20 steps",
+  "adviceCount": 1,
+  "seconds": 50.314,
+  "adviceWaitSeconds": 29.658,
+  "secondsExcludingAdviceWait": 20.656,
+  "recoveryChecks": {
+    "status": "passed",
+    "passing": 22,
+    "total": 22
+  },
+  "stripeStatus": "passed"
+}

@@ -1,0 +1,15 @@
+{
+  "source": "Codex assistant via operator input; not a human or model court",
+  "waitSeconds": 29.65795720799906,
+  "verdict": {
+    "ruling": "change_strategy",
+    "reasoning": "Score stale since turn 4; source has useful fixes and remaining payment/pricing defects.",
+    "cited_events": [
+      4,
+      7,
+      9,
+      12
+    ],
+    "instruction": "Run run_tests {} now. In pricing.total tax discounted, not subtotal. In payments.charge send amount_cents unchanged, make one request, propagate transport/JSON errors (no txn_pending), and return body['transaction_id'], raising if absent. Create recovery.json with dependency payments, mode test_mock, integrationStatus unverified, and an explanatory reason; only the trusted runner mocks original tests. Never mock production payment success. Use available tools only, then rerun tests."
+  }
+}

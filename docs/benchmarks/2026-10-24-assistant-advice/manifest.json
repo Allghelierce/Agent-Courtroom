@@ -1,0 +1,16 @@
+{
+  "revision": "fc569efaebe9c102ae706b750a2f8d26dc66c7ea",
+  "supervisionMode": "assistant_advice",
+  "modelCourtUsed": false,
+  "model": "openai/gpt-oss-20b",
+  "maxSteps": 100,
+  "workerBudgetUsd": 0.5,
+  "seedDigest": "9f5c9f0516fc797e68ad7155679079aceb01334a86082fb8c4ffd0b2f60553a8",
+  "freshStart": true,
+  "monitors": [
+    "looping",
+    "stalling"
+  ],
+  "adviceCost": "unknown; external assistant usage",
+  "limitation": "Advisor can inspect source and knows prior attempts; not an equal-information courtroom comparison."
+}

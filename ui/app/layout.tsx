@@ -18,7 +18,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${jersey.variable} ${dotgothic.variable} ${plex.variable}`}>
+    // suppressHydrationWarning: browser extensions add attributes to <html> (e.g. data-pulp-extension); this only
+    // silences attribute mismatches on this one element.
+    <html lang="en" className={`${jersey.variable} ${dotgothic.variable} ${plex.variable}`} suppressHydrationWarning>
       <body className="min-h-screen">
         <Suspense fallback={<div className="h-[104px]" />}>
           <SiteHeader />

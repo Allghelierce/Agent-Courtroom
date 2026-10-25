@@ -1,0 +1,88 @@
+{
+  "id": "case-d6334ab5",
+  "workerId": "with-court-1",
+  "charge": {
+    "id": 1,
+    "workerId": "with-court-1",
+    "kind": "stalling",
+    "summary": "Passing tests stuck at 18/20 for 8 steps",
+    "eventIds": [
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19
+    ]
+  },
+  "prosecution": {
+    "side": "prosecution",
+    "model": "openai/gpt-oss-20b",
+    "argument": "The worker has stalled at 18/20 tests for eight consecutive steps, with no new passes. Repeated malformed calls in events 7, 12, 14, 16 and duplicate edit attempts in 17 and 18 waste resources and inflate spend to 2% of budget. This looping behavior shows the worker cannot advance and should not continue.",
+    "cited_events": [
+      7,
+      12,
+      14,
+      16,
+      17,
+      18
+    ],
+    "costUsd": 0.000198675,
+    "costComplete": true,
+    "usage": {
+      "input_tokens": 2033,
+      "output_tokens": 154
+    }
+  },
+  "defense": {
+    "side": "defense",
+    "model": "openai/gpt-oss-20b",
+    "argument": "The worker has progressed from 5 to 18 passing tests, a 13‑point leap, by editing cart.py, pricing.py, checkout.py, and payments.py as shown in events #3, #5, #6, #10, and creating recovery.json in #9. The stalled 8 steps after step 11 were due to repeated malformed tool calls (#12, #16) and a single edit failure (#17, #18) that can be remedied without restarting the work. Thus the work is worthwhile and only a minor correction is needed. The court should “change_strategy” to resolve the tool call issue and resume progress.",
+    "cited_events": [
+      3,
+      5,
+      6,
+      10,
+      9,
+      12,
+      16,
+      17,
+      18
+    ],
+    "costUsd": 0.000211875,
+    "costComplete": true,
+    "usage": {
+      "input_tokens": 2033,
+      "output_tokens": 198
+    }
+  },
+  "verdict": {
+    "ruling": "change_strategy",
+    "instruction": "Update payments.py to load the recovery.json configuration and implement a mock gateway function that returns a successful response for test mode; then invoke run_tests with a valid empty JSON object ({}).",
+    "reasoning": "The worker reached 18/20 passing tests (event 11) but is blocked by malformed tool calls (events 12,16) and a failing edit due to incorrect old_str handling (events 17,18); fixing the mock gateway logic (events 9,10) and ensuring proper tool call syntax will allow progress without restarting.",
+    "cited_events": [
+      9,
+      10,
+      11,
+      12,
+      16,
+      17,
+      18
+    ]
+  },
+  "precedents": [],
+  "runSince": "2026-10-25T01:35:13.431+00:00",
+  "judgeModel": "openai/gpt-oss-120b",
+  "judgeUsage": {
+    "input_tokens": 2390,
+    "output_tokens": 537
+  },
+  "costUsd": 0.001091,
+  "costComplete": true,
+  "pricingDate": "2026-10-24",
+  "startedAt": "2026-10-25T01:35:48.416Z",
+  "finishedAt": "2026-10-25T01:35:50.774Z",
+  "mock": false
+}

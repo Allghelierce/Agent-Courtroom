@@ -1,0 +1,62 @@
+{
+  "id": "case-3aa277ea",
+  "workerId": "with-court-1",
+  "charge": {
+    "id": 2,
+    "workerId": "with-court-1",
+    "kind": "stalling",
+    "summary": "Passing tests stuck at 13/20 for 8 steps",
+    "eventIds": [
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27
+    ]
+  },
+  "prosecution": {
+    "side": "prosecution",
+    "model": "none",
+    "argument": "The worker was charged again under a minute after case-d6334ab5 gave it a new strategy. The court's order didn't work.",
+    "cited_events": [],
+    "costUsd": 0,
+    "costComplete": true
+  },
+  "defense": {
+    "side": "defense",
+    "model": "none",
+    "argument": "The defense was not heard: a repeat offense goes straight to a human.",
+    "cited_events": [],
+    "costUsd": 0,
+    "costComplete": true
+  },
+  "verdict": {
+    "ruling": "escalate",
+    "reasoning": "Charged again (stalling) under a minute after case-d6334ab5 ordered a new strategy (\"Update payments.py to load the recovery.json configuration and implement a mock gateway function that returns a successful response for tes…\"). The new strategy didn't work, so a human should decide instead of another trial.",
+    "cited_events": [
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27
+    ]
+  },
+  "summary": "repeat_offender",
+  "priorCaseIds": [
+    "case-d6334ab5"
+  ],
+  "runSince": "2026-10-25T01:35:13.431+00:00",
+  "judgeModel": "none",
+  "costUsd": 0,
+  "costComplete": true,
+  "pricingDate": "2026-10-24",
+  "startedAt": "2026-10-25T01:35:59.162Z",
+  "finishedAt": "2026-10-25T01:35:59.162Z",
+  "mock": false
+}

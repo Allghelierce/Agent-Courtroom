@@ -1,0 +1,129 @@
+{
+  "task": "checkout-v2",
+  "outcomeVerified": false,
+  "reviewStatus": "independent checks complete; human diff review pending",
+  "changedFiles": [
+    "cart.py",
+    "checkout.py",
+    "payments.py",
+    "pricing.py",
+    "recovery.json"
+  ],
+  "sourceSha256": {
+    "README.md": "6efbab3050a9edbf86b2a797881d6327fea13e7e8650230299ee9d10992b35a7",
+    "cart.py": "930c3cf021e1f6d546caa999d88cc705d5ccd267e4a888adf4328489e832fc0c",
+    "checkout.py": "b674d3a42d86848e9482673433a92c46f4980efaf1b898cf9a0f93590af8e2df",
+    "payments.py": "d354d09f15ef948545aacfa146aa35e1a81ac06cf5e10d4dc529e3045e9f0a2c",
+    "pricing.py": "bcb170dcb80e9449bb977940b4b9218ecb61cc3a10c7d9e92a762769d6c30409",
+    "recovery.json": "acb43926a7eb3f2a39efd2dcf8e8456be666f28565b9f8e46d72f74f6b008f38",
+    "tests/test_cart.py": "d7f4aaeb986363f031212a0b02117258f082d80fff1e662fe31a65ef0f651051",
+    "tests/test_checkout.py": "be3cddb6189c754f15d5ed58df2923eb3d0a276ec4de43cb7ef6c7af59ecb2e4",
+    "tests/test_pricing.py": "8af0b81e3576139aa4b483a12b0a0c1a0b6e5abb09dad741750c4d02e55c0475"
+  },
+  "recoveryChecks": {
+    "status": "failed",
+    "profile": "checkout-v2",
+    "heldout": true,
+    "checks": [
+      {
+        "name": "original_tests_unchanged",
+        "passed": true,
+        "detail": "Original tests must remain unchanged; use recovery.json for a test-only mock."
+      },
+      {
+        "name": "declared_test_mock",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_cart.TestCart.test_add_item_accumulates_quantity",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_cart.TestCart.test_item_count",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_cart.TestCart.test_rejects_nonpositive_quantity",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_cart.TestCart.test_remove_last_item_deletes_sku",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_cart.TestCart.test_subtotal_uses_quantity",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_checkout.TestCheckout.test_checkout_charges_the_gateway",
+        "passed": false,
+        "detail": "Missing receipt_id in gateway response"
+      },
+      {
+        "name": "trusted_test_checkout.TestCheckout.test_receipt_amount",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_pricing.TestPricing.test_discount_is_a_percentage",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_pricing.TestPricing.test_tax",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_pricing.TestPricing.test_total_taxes_the_discounted_amount",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_pricing.TestPricing.test_total_without_discount",
+        "passed": true
+      },
+      {
+        "name": "gateway_success_exact_request_and_receipt",
+        "passed": false,
+        "detail": "RuntimeError: Missing receipt_id in gateway response"
+      },
+      {
+        "name": "no_receipt_on_decline",
+        "passed": true
+      },
+      {
+        "name": "no_receipt_on_connection",
+        "passed": true
+      },
+      {
+        "name": "no_receipt_on_timeout",
+        "passed": true
+      },
+      {
+        "name": "no_receipt_on_server_error",
+        "passed": true
+      },
+      {
+        "name": "no_receipt_on_invalid_json",
+        "passed": true
+      },
+      {
+        "name": "no_receipt_on_missing_transaction",
+        "passed": true
+      },
+      {
+        "name": "generated_100_carts",
+        "passed": true
+      },
+      {
+        "name": "discount_boundaries_and_monotonicity",
+        "passed": true
+      }
+    ],
+    "passing": 20,
+    "total": 22
+  },
+  "stripeChecks": {
+    "status": "not_run",
+    "reason": "Recovery checks did not pass; do not send invalid checkout to Stripe"
+  },
+  "testExitCode": 1,
+  "testTimedOut": false
+}

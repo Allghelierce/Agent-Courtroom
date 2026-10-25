@@ -2,8 +2,11 @@
 start time in the evidence packet."""
 
 import unittest
+import io
+import json
+from unittest.mock import patch
 
-from courtroom_engine.court import build_packet
+from courtroom_engine.court import HttpCourt, build_packet
 from courtroom_engine.schema import Charge, Event
 from courtroom_engine.tasks.coding import first_failure
 
@@ -65,6 +68,15 @@ class PacketTest(unittest.TestCase):
 
     def test_omits_it_otherwise(self):
         self.assertNotIn("workerStartedAt", build_packet(self.charge, self.events, 2.0, "task"))
+
+    def test_http_wait_outlasts_two_minute_court_deadline(self):
+        response = io.BytesIO(json.dumps({"ruling": "continue", "reasoning": "progress", "cited_events": [1]}).encode())
+        response.headers = {}
+        packet = build_packet(self.charge, self.events, 2.0, "task")
+        with patch("courtroom_engine.court.urllib.request.urlopen", return_value=response) as request:
+            verdict = HttpCourt("http://127.0.0.1/verdict").convene(packet)
+        self.assertEqual(verdict.ruling, "continue")
+        self.assertEqual(request.call_args.kwargs["timeout"], 130.0)
 
 
 if __name__ == "__main__":

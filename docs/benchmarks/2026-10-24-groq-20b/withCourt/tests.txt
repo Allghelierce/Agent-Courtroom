@@ -1,0 +1,16 @@
+test_add_item_accumulates_quantity (test_cart.TestCart.test_add_item_accumulates_quantity) ... ok
+test_item_count (test_cart.TestCart.test_item_count) ... ok
+test_rejects_nonpositive_quantity (test_cart.TestCart.test_rejects_nonpositive_quantity) ... ok
+test_remove_last_item_deletes_sku (test_cart.TestCart.test_remove_last_item_deletes_sku) ... ok
+test_subtotal_uses_quantity (test_cart.TestCart.test_subtotal_uses_quantity) ... ok
+test_checkout_charges_the_gateway (test_checkout.TestCheckout.test_checkout_charges_the_gateway) ... ok
+test_receipt_amount (test_checkout.TestCheckout.test_receipt_amount) ... ok
+test_discount_is_a_percentage (test_pricing.TestPricing.test_discount_is_a_percentage) ... ok
+test_tax (test_pricing.TestPricing.test_tax) ... ok
+test_total_taxes_the_discounted_amount (test_pricing.TestPricing.test_total_taxes_the_discounted_amount) ... ok
+test_total_without_discount (test_pricing.TestPricing.test_total_without_discount) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.009s
+
+OK

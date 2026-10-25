@@ -1,0 +1,51 @@
+{
+  "runId": "run-d096c898bc5f48c4b077cdf0040ebadc",
+  "startedAt": "2026-10-25T00:09:03.372348+00:00",
+  "mode": "stripe_sandbox",
+  "amountCents": 3897,
+  "currency": "usd",
+  "checks": [
+    {
+      "name": "successful_payment",
+      "passed": true,
+      "source": "stripe_api",
+      "receipt": {
+        "transaction_id": "pi_3UUEzjDnIxnKMIkS48sKOoK4",
+        "amount_cents": 3897,
+        "currency": "usd",
+        "sandbox": true
+      }
+    },
+    {
+      "name": "idempotent_retry",
+      "passed": true,
+      "source": "stripe_api",
+      "transactionId": "pi_3UUEzjDnIxnKMIkS48sKOoK4"
+    },
+    {
+      "name": "retrieve_and_verify",
+      "passed": true,
+      "source": "stripe_api",
+      "receipt": {
+        "transaction_id": "pi_3UUEzjDnIxnKMIkS48sKOoK4",
+        "amount_cents": 3897,
+        "currency": "usd",
+        "sandbox": true
+      }
+    },
+    {
+      "name": "declined_payment_no_receipt",
+      "passed": true,
+      "source": "stripe_api",
+      "transactionId": "pi_3UUEzlDnIxnKMIkS3J8fWsmC"
+    },
+    {
+      "name": "connection_failure_no_receipt",
+      "passed": true,
+      "source": "locally_injected_failure",
+      "outcomeUnknown": true
+    }
+  ],
+  "passed": true,
+  "finishedAt": "2026-10-25T00:09:06.167797+00:00"
+}

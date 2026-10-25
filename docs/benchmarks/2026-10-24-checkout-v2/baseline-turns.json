@@ -1,0 +1,16 @@
+{
+  "with-court-1": {
+    "recordedModelTurns": 8,
+    "toolSteps": 8,
+    "readFileCalls": 6,
+    "batchReadCalls": 0,
+    "incompleteUsageRecords": 1
+  },
+  "no-court-2": {
+    "recordedModelTurns": 21,
+    "toolSteps": 21,
+    "readFileCalls": 11,
+    "batchReadCalls": 0,
+    "incompleteUsageRecords": 1
+  }
+}

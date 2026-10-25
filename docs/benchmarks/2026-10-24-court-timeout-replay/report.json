@@ -1,0 +1,33 @@
+{
+  "sourceCase": "case-77dfe9a4",
+  "revision": "a8311486d7e12f5cc16fa40afdf0bf658baebe67",
+  "courtDeadlineMs": 120000,
+  "engineTimeoutSeconds": 130,
+  "status": "finished",
+  "scope": "one live court replay only; worker is not resumed",
+  "elapsedSeconds": 56.187,
+  "verdict": {
+    "ruling": "change_strategy",
+    "reasoning": "The worker has only performed file reads (events 1\u20118) with no code changes or test executions, leaving the pass count at 12/20, which indicates stalling. A malformed tool call (event 3) can be avoided by retrying, but the core lack of progress requires a shift to actually fixing code and running tests.",
+    "cited_events": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "instruction": "Run the test suite (e.g., using the appropriate test command) to identify the failing tests, then edit checkout.py to address the reported bugs before re\u2011running the tests."
+  },
+  "caseId": "case-3b0c6178",
+  "trialRetrieved": true,
+  "costUsd": 0.000707,
+  "costComplete": true,
+  "judgeUsage": {
+    "input_tokens": 1395,
+    "output_tokens": 427
+  },
+  "judgeModel": "openai/gpt-oss-120b"
+}

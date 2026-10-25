@@ -436,6 +436,7 @@ export function createDaemon(opts: DaemonOptions = {}) {
 
   function stream(req: IncomingMessage, res: ServerResponse) {
     res.writeHead(200, { ...cors.get(res), "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
+    res.flushHeaders(); // open now, even with nothing to replay, so the dashboard sees the daemon is up
     const after = Number(req.headers["last-event-id"] ?? 0) || 0;
     for (const msg of history) if ((msg.sequence ?? 0) > after) res.write(`id: ${msg.sequence}\ndata: ${JSON.stringify(msg)}\n\n`);
     subscribers.add(res);

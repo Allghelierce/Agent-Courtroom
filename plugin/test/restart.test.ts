@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createDaemon, type HookInput } from "../src/daemon.ts";
@@ -24,6 +25,26 @@ test("SessionEnd closes out a session the daemon only knows from its stream log"
   assert.equal(last.state, "succeeded");
   assert.equal(last.summary, "Session ended at step 1");
   assert.ok(last.endedAt);
+});
+
+test("/stream opens right away even with nothing to replay", async () => {
+  // A fresh daemon (or one whose history was wiped) has nothing to send yet; the dashboard must still see it's up.
+  const home = mkdtempSync(join(tmpdir(), "courtroom-restart-"));
+  const port = await new Promise<number>((ok) => {
+    const s = createServer().listen(0, "127.0.0.1", () => {
+      const p = (s.address() as { port: number }).port;
+      s.close(() => ok(p));
+    });
+  });
+  const d = createDaemon({ home, port, mock: true });
+  await d.listen();
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/stream`, { signal: AbortSignal.timeout(1500) });
+    assert.equal(res.headers.get("content-type"), "text/event-stream");
+    await res.body?.cancel();
+  } finally {
+    await d.close();
+  }
 });
 
 test("SessionEnd for a session the daemon never saw adds nothing", async () => {

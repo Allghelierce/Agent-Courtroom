@@ -196,7 +196,9 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       };
       timer = setTimeout(retry, 1500);
       current.onopen = () => {
-        if (!opened) dispatch({ type: "reset" }); // drop the replay for the real thing
+        // Every connection is fresh, so the engine replays its whole history: rebuild from it. That drops the demo
+        // replay, and copes with an engine restarted with its history wiped (sequence numbers from 1 again).
+        dispatch({ type: "reset" });
         opened = true;
         clearTimeout(timer);
         setSource("live");
@@ -209,9 +211,8 @@ export function LiveProvider({ children }: { children: ReactNode }) {
         }
       };
       current.onerror = () => {
-        if (!opened) return retry();
-        setSource("disconnected"); // EventSource keeps retrying and onopen flips this back, unless it gives up
-        if (current.readyState === EventSource.CLOSED) retry();
+        if (opened) setSource("disconnected"); // keep showing the last data received until it's back
+        retry(); // reconnect fresh rather than let the browser resume from an event id the engine may not have
       };
     };
     connect();

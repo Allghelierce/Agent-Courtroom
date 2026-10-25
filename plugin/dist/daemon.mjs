@@ -51165,6 +51165,7 @@ Stop now. Don't call more tools; explain the situation to the user and ask how t
   }
   function stream2(req, res) {
     res.writeHead(200, { ...cors.get(res), "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
+    res.flushHeaders();
     const after = Number(req.headers["last-event-id"] ?? 0) || 0;
     for (const msg of history) if ((msg.sequence ?? 0) > after) res.write(`id: ${msg.sequence}
 data: ${JSON.stringify(msg)}

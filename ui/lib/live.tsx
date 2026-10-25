@@ -63,6 +63,8 @@ function apply(state: RunState, msg: StreamMessage | { type: "reset" }): RunStat
       return {
         ...base,
         ...put(d.workerId, { ...w, status: d }),
+        // A finished worker has no trial left to wait for.
+        openCharges: ended ? state.openCharges.filter((c) => c.workerId !== d.workerId) : state.openCharges,
         lastAt: d.endedAt ?? state.lastAt,
         feed: ended
           ? feed({ workerId: d.workerId, tone: d.state === "succeeded" ? "done" : "fail", text: d.summary ?? d.state }, d.endedAt)
@@ -84,11 +86,14 @@ function apply(state: RunState, msg: StreamMessage | { type: "reset" }): RunStat
     case "charge": {
       const c = msg.data;
       const w = worker(c.workerId);
+      // Without a court (the comparison's unsupervised run) the warning light flashes and nobody acts.
+      const court = w.status.courtEnabled !== false;
+      const flagged = `Monitor flagged ${KIND_LABEL[c.kind].toLowerCase()}.`;
       return {
         ...base,
         ...put(c.workerId, { ...w, charges: [...w.charges, c] }),
-        openCharges: [...state.openCharges, c],
-        feed: feed({ workerId: c.workerId, tone: "charge", text: `Monitor flagged ${KIND_LABEL[c.kind].toLowerCase()}. Court is in session.`, charge: { workerId: c.workerId, id: c.id ?? 0 } }),
+        openCharges: court ? [...state.openCharges, c] : state.openCharges,
+        feed: feed({ workerId: c.workerId, tone: "charge", text: court ? `${flagged} Court is in session.` : `${flagged} No court on this run, so it keeps going.`, charge: { workerId: c.workerId, id: c.id ?? 0 } }),
       };
     }
     case "verdict": {

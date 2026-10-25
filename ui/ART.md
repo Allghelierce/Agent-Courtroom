@@ -1,4 +1,4 @@
-# Docket art guide
+# Agent Courtroom art guide
 
 Read this before you touch anything visual, so the dashboard, the courtroom and the case log look like one game.
 
@@ -26,7 +26,7 @@ Two rules hold everything together:
 
 ## Logo
 
-The logo is a **16×16 pixel gavel striking its block** (`public/docket-logo.svg`): wood browns and a gold band in the courtroom's palette, a highlight pixel on the head, and the same 1px `#120c22` outline every sprite has. It's the header mark at 3x (48px) beside the "Docket" wordmark (Jersey 10, 40px, gold with a `#7a2348` shadow) and the browser-tab icon at 1x. Keep it on the 16px grid so it stays crisp at 16, 32 and 48px. The 8×8 gavel in buttons (`PixelIcon`) is a separate, simpler glyph.
+The logo is a **16×16 pixel gavel striking its block** (`public/logo.svg`): wood browns and a gold band in the courtroom's palette, a highlight pixel on the head, and the same 1px `#120c22` outline every sprite has. It's the header mark at 3x (48px) beside the "Agent Courtroom" wordmark (Jersey 10, 40px, gold with a `#7a2348` shadow) and the browser-tab icon at 1x. Keep it on the 16px grid so it stays crisp at 16, 32 and 48px. The 8×8 gavel in buttons (`PixelIcon`) is a separate, simpler glyph.
 
 ## The pixel grid
 

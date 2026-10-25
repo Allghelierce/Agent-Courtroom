@@ -1,4 +1,4 @@
-# Docket art guide
+# Agent Courtroom art guide
 
 Read this before you touch anything visual, so the dashboard, the courtroom and the case log look like one game.
 
@@ -6,7 +6,7 @@ Read this before you touch anything visual, so the dashboard, the courtroom and 
 
 **The courtroom is the face. The numbers prove it works.**
 
-- **The courtroom leads.** The dashboard opens on the courtroom scene: the live trial while court is in session, otherwise the latest intervention. Then the impact numbers (saved vs. unsupervised, interventions, cost of oversight), the with/without comparison, the monitor rules, the workers, the interventions table and the activity log.
+- **The courtroom leads.** The dashboard opens on the courtroom scene: the live trial while court is in session, otherwise the latest intervention, unless a worker (a Claude Code session) connected after it: then a green "Session connected" panel shows the court has picked it up. Then the impact numbers (saved vs. unsupervised, interventions, cost of oversight), the with/without comparison, the monitor rules, the workers, the interventions table and the activity log.
 - **Pixel chrome, readable data.** Every surface is pixel art: 4px borders, hard shadows, Jersey 10 headings, pixel buttons and tags. But text, numbers and tables are IBM Plex Sans with tabular figures, so the data reads like a real tool, not a game menu.
 - **Sharp by construction.** The page is 1064px wide so its content (1032px) is exactly the courtroom at 4x plus its frame, and the dashboard's scene sits at exactly 2x in a 520px column. Frames hug the canvas (`FramedScene`, `useIntegerScale`), so the art is never letterboxed or scaled by a fraction. Sections share one four-column rhythm: impact numbers, monitors, worker cards.
 - **The courtroom's own text stays in-world.** The dialogue box and the evidence pinned in the scene use DotGothic16 (the `.vn` class); cut-ins and the stamp use Jersey 10.
@@ -26,7 +26,7 @@ Two rules hold everything together:
 
 ## Logo
 
-The logo is a **16×16 pixel gavel striking its block** (`public/docket-logo.svg`): wood browns and a gold band in the courtroom's palette, a highlight pixel on the head, and the same 1px `#120c22` outline every sprite has. It's the header mark at 3x (48px) beside the "Docket" wordmark (Jersey 10, 40px, gold with a `#7a2348` shadow) and the browser-tab icon at 1x. Keep it on the 16px grid so it stays crisp at 16, 32 and 48px. The 8×8 gavel in buttons (`PixelIcon`) is a separate, simpler glyph.
+The logo is a **16×16 pixel gavel striking its block** (`public/logo.svg`): wood browns and a gold band in the courtroom's palette, a highlight pixel on the head, and the same 1px `#120c22` outline every sprite has. It's the header mark at 3x (48px) beside the "Agent Courtroom" wordmark (Jersey 10, 40px, gold with a `#7a2348` shadow) and the browser-tab icon at 1x. Keep it on the 16px grid so it stays crisp at 16, 32 and 48px. The 8×8 gavel in buttons (`PixelIcon`) is a separate, simpler glyph.
 
 ## The pixel grid
 

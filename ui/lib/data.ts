@@ -60,6 +60,11 @@ export function usd(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
+// Workers from the Claude Code plugin are sessions (plugin/src/daemon.ts names them claude-code:<folder>:<id>).
+export function isClaudeSession(workerId: string): boolean {
+  return workerId.startsWith("claude-code:");
+}
+
 export function clock(iso: string): string {
   if (!iso) return "";
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });

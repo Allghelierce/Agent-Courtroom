@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 import type { Charge, Event, Trial } from "@court/types";
-import { COURT_URL, ENGINE_URL, KIND_LABEL, RULING_LABEL, describeEvent, eventFailed } from "./data";
+import { COURT_URL, ENGINE_URL, KIND_LABEL, RULING_LABEL, describeEvent, eventFailed, isClaudeSession } from "./data";
 import { DEMO_GAPS, DEMO_STREAM, DEMO_TRIALS, demoTrialId, type ComparisonResult, type StreamMessage, type VerdictMessage, type WorkerStatus } from "./stream";
 
 // One live picture of every worker, built from StreamMessages (shared/schema.ts). It comes from the engine's SSE
@@ -15,7 +15,7 @@ export type FeedItem = {
   seq: number;
   at: string;
   workerId: string;
-  tone: "event" | "fail" | "charge" | "verdict" | "done";
+  tone: "start" | "event" | "fail" | "charge" | "verdict" | "done";
   text: string;
   charge?: { workerId: string; id: number };
 };
@@ -36,6 +36,7 @@ type RunState = {
 
 const EMPTY: RunState = { workers: {}, order: [], feed: [], openCharges: [], verdicts: [], trials: {}, lastAt: "", lastSequence: 0, seq: 0 };
 const FEED_MAX = 200;
+const RETRY_MS = 5000; // while the engine's stream is down, look for it this often
 
 function apply(state: RunState, msg: StreamMessage | { type: "reset" }): RunState {
   if (msg.type === "reset") return EMPTY;
@@ -56,12 +57,18 @@ function apply(state: RunState, msg: StreamMessage | { type: "reset" }): RunStat
     case "worker": {
       const d = msg.data;
       const w = worker(d.workerId);
+      const started = !state.workers[d.workerId] && !d.endedAt;
       const ended = d.endedAt && !w.status.endedAt;
+      const startText = `${isClaudeSession(d.workerId) ? "Session connected" : "Started"}${d.task ? `: ${d.task}` : ""}`;
       return {
         ...base,
         ...put(d.workerId, { ...w, status: d }),
         lastAt: d.endedAt ?? state.lastAt,
-        feed: ended ? feed({ workerId: d.workerId, tone: d.state === "succeeded" ? "done" : "fail", text: d.summary ?? d.state }, d.endedAt) : state.feed,
+        feed: ended
+          ? feed({ workerId: d.workerId, tone: d.state === "succeeded" ? "done" : "fail", text: d.summary ?? d.state }, d.endedAt)
+          : started
+            ? feed({ workerId: d.workerId, tone: "start", text: startText }, d.startedAt)
+            : state.feed,
       };
     }
     case "event": {
@@ -170,42 +177,48 @@ export function LiveProvider({ children }: { children: ReactNode }) {
   const [demoChosen, setDemoChosen] = useState(false);
   const courtCases = useCourtCases();
 
-  // Try the engine's stream first; fall back to the bundled replay if it isn't up. A viewer who picks the recorded
-  // demo skips the engine entirely until they go back to it.
+  // Try the engine's stream first; fall back to the bundled replay if it isn't up, and keep looking for it: the Claude
+  // Code plugin only starts its daemon when a session does, often after this page has loaded. A viewer who picks the
+  // recorded demo skips the engine entirely until they go back to it.
   useEffect(() => {
     if (demoChosen) return;
-    const es = new EventSource(`${ENGINE_URL}/stream`);
+    let es: EventSource | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     let opened = false;
-    const timer = setTimeout(() => {
-      if (opened) return;
-      es.close();
-      setSource("replay");
-    }, 1500);
-    es.onopen = () => {
-      if (!opened) dispatch({ type: "reset" });
-      opened = true;
-      clearTimeout(timer);
-      setSource("live");
+    const connect = () => {
+      const current = new EventSource(`${ENGINE_URL}/stream`);
+      es = current;
+      const retry = () => {
+        clearTimeout(timer);
+        current.close();
+        if (!opened) setSource("replay"); // once live, keep showing the last data received
+        timer = setTimeout(connect, RETRY_MS);
+      };
+      timer = setTimeout(retry, 1500);
+      current.onopen = () => {
+        // Every connection is fresh, so the engine replays its whole history: rebuild from it. That drops the demo
+        // replay, and copes with an engine restarted with its history wiped (sequence numbers from 1 again).
+        dispatch({ type: "reset" });
+        opened = true;
+        clearTimeout(timer);
+        setSource("live");
+      };
+      current.onmessage = (e) => {
+        try {
+          dispatch(JSON.parse(e.data) as StreamMessage);
+        } catch {
+          // ignore a malformed line
+        }
+      };
+      current.onerror = () => {
+        if (opened) setSource("disconnected"); // keep showing the last data received until it's back
+        retry(); // reconnect fresh rather than let the browser resume from an event id the engine may not have
+      };
     };
-    es.onmessage = (e) => {
-      try {
-        dispatch(JSON.parse(e.data) as StreamMessage);
-      } catch {
-        // ignore a malformed line
-      }
-    };
-    es.onerror = () => {
-      if (opened) {
-        setSource("disconnected"); // EventSource keeps retrying; onopen flips this back
-        return;
-      }
-      clearTimeout(timer);
-      es.close();
-      setSource("replay");
-    };
+    connect();
     return () => {
       clearTimeout(timer);
-      es.close();
+      es?.close();
     };
   }, [demoChosen]);
 

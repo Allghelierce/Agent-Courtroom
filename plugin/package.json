@@ -6,6 +6,7 @@
   "scripts": {
     "build": "node build.mjs",
     "test": "../court/node_modules/.bin/tsx --test test/*.test.ts",
-    "typecheck": "../court/node_modules/.bin/tsc -p ."
+    "typecheck": "../court/node_modules/.bin/tsc -p .",
+    "replay": "../court/node_modules/.bin/tsx scripts/replay.ts"
   }
 }

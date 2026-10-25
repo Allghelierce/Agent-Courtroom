@@ -47,6 +47,10 @@ Then open http://localhost:3000.
   - Cost comes from the session transcript.
 - The daemon then runs the monitors on the events since the last ruling.
 - Stalling and the per-test spend rule only apply once a test run has been seen, so a session with no tests is judged only on looping, flailing, and the budget.
+- Sessions use stricter rules than the engine (`SESSION_CONFIG` in `src/monitors.ts`):
+  - **Looping** only counts failed repeats (a tool error, or tests still failing), and compares shell commands without `cd x &&`, `2>&1`, `| tail`/`| head`, or `-v`/`-q`.
+  - **Stalling** needs at least two runs of one suite in the window, with tests still failing and the same total throughout.
+  - **Why:** replaying 689 real sessions (38,000 tool calls) with `npm run replay`, the engine rules charged 147 times, almost all on healthy work. The session rules charged 7 times.
 - If the hook or the daemon fails, the hook exits quietly, so the courtroom never breaks your session.
 
 **Privacy:** the daemon listens only on localhost.
@@ -75,6 +79,7 @@ cd ../plugin
 npm run build              # writes dist/ (commit it: installs don't build)
 npm test                   # monitor parity with the Python engine, mapping, cost, end to end, dist freshness
 npm run typecheck
+npm run replay             # replay your saved Claude Code sessions through the checks: how often would the court convene?
 ```
 
 `dist/daemon.mjs` bundles `court/src`, so **run `npm run build` here after any change to `court/` or `plugin/src`, and commit `dist/`**. The `dist/ matches a fresh build` test fails until you do.

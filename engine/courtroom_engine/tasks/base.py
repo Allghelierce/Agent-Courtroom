@@ -53,3 +53,4 @@ class Task:
     seed: Path
     make_env: Callable[[Path], Env]
     make_script: Callable[[], Script] = field(repr=False, default=None)
+    read_only_tools: frozenset[str] = frozenset()  # tools that only look; see monitors.stalling

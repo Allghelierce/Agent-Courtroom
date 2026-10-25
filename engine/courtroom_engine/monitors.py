@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 from .schema import ChargeKind, Event
@@ -27,6 +27,10 @@ class MonitorConfig:
     loop_repeats: int = 3  # same action + same outcome this many times...
     loop_window: int = 10  # ...within this many steps
     stall_steps: int = 8  # no new passing test in this many steps
+    # Tools that only look (read a file, run the tests). Steps before the first other tool
+    # are exploration, so the stall clock starts at the first change...
+    read_only_tools: frozenset[str] = field(default_factory=frozenset)
+    exploring_steps: int = 16  # ...unless the worker only ever looks, for this many steps
     budget_fraction: float = 0.8  # charge once spend passes this share of the budget
     cost_per_test_usd: float = 0.50  # charge when spend per newly passing test is above this
     cost_per_test_min_steps: int = 6
@@ -58,7 +62,10 @@ def looping(events: list[Event], cfg: MonitorConfig, budget_usd: float) -> Optio
 
 
 def stalling(events: list[Event], cfg: MonitorConfig, budget_usd: float) -> Optional[Finding]:
-    if len(events) < cfg.stall_steps:
+    # Reading the code before touching it is how a careful agent starts, not a stall.
+    acted = next((i for i, e in enumerate(events) if e.tool not in cfg.read_only_tools), None)
+    needed, start = (cfg.exploring_steps, 0) if acted is None else (cfg.stall_steps, acted)
+    if len(events) - start < needed:
         return None
     recent = events[-cfg.stall_steps :]
     before = events[-cfg.stall_steps - 1].testsPassing if len(events) > cfg.stall_steps else None
@@ -66,11 +73,11 @@ def stalling(events: list[Event], cfg: MonitorConfig, budget_usd: float) -> Opti
     if max(e.testsPassing for e in recent) > best_before:
         return None
     last = recent[-1]
-    return Finding(
-        "stalling",
-        f"Passing tests stuck at {last.testsPassing}/{last.testsTotal} for {cfg.stall_steps} steps",
-        [e.id for e in recent],
-    )
+    if acted is None:
+        summary = f"{len(events)} steps of only reading and testing, no changes made, at {last.testsPassing}/{last.testsTotal}"
+    else:
+        summary = f"Passing tests stuck at {last.testsPassing}/{last.testsTotal} for {cfg.stall_steps} steps"
+    return Finding("stalling", summary, [e.id for e in recent])
 
 
 def overspending(events: list[Event], cfg: MonitorConfig, budget_usd: float) -> Optional[Finding]:

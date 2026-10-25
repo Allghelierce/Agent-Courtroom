@@ -264,4 +264,5 @@ TASK = Task(
     seed=SEEDS / "checkout",
     make_env=CodingEnv,
     make_script=make_script,
+    read_only_tools=frozenset({"list_files", "read_file", "run_tests"}),
 )

@@ -204,4 +204,5 @@ TASK = Task(
     seed=SEEDS / "price_watch",
     make_env=PriceEnv,
     make_script=make_script,
+    read_only_tools=frozenset({"list_products", "fetch_page"}),
 )

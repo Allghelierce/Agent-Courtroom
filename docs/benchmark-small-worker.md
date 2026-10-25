@@ -15,7 +15,8 @@ At a monitor trigger, the 120B advisor receives the full task rules, documented
 tools, recent events and current source, including the original visible tests.
 It sees no reference solution or prior-run advice. Advice cannot change task
 permissions. All inputs, outputs, token usage and decisions are retained.
-The advisor gets a 120-second request timeout, no hidden retries, and a separate
+The advisor gets a 120-second request deadline, one recorded retry for recognized
+provider output-format errors (failed usage stays unknown), and a separate
 $0.10 budget checked between calls. A failed request halts without substituted
 human/assistant guidance. Escalations halt because no human wait is configured.
 

@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+import httpx
+from groq import BadRequestError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 from small_worker_benchmark import OpenRouterBrain, ModelAdvisor, WORKER_MODEL, ADVISOR_MODEL
@@ -13,6 +15,28 @@ from courtroom_engine.engine import get_task
 
 
 class SmallWorkerTests(unittest.TestCase):
+    def test_advisor_format_retries_are_bounded_and_usage_stays_unknown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "source").mkdir()
+            calls = []
+            def create(**kwargs):
+                calls.append(kwargs)
+                raise BadRequestError("Invalid JSON", response=httpx.Response(400,
+                    request=httpx.Request("POST", "https://example.test")),
+                    body={"error": {"code": "json_validate_failed"}})
+            advisor = ModelAdvisor(SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create))),
+                root / "out", [SimpleNamespace(root=root / "source")], get_task("checkout-v2"))
+            packet = {"events": [{"id": 8, "step": 8}], "charge": {"workerId": "test", "summary": "stall"}}
+            with contextlib.redirect_stdout(io.StringIO()):
+                verdict = advisor.convene(packet)
+            self.assertEqual(len(calls), 2)
+            self.assertLessEqual(calls[1]["timeout"], calls[0]["timeout"])
+            self.assertFalse(advisor.complete)
+            self.assertEqual(verdict.ruling, "halt")
+            report = json.loads((root / "out/advice/1/response.json").read_text())
+            self.assertEqual(len(report["requestErrors"]), 2)
+
     def test_router_pins_tool_capable_provider_and_uses_supported_output_limit(self):
         captured = {}
         brain = OpenRouterBrain.__new__(OpenRouterBrain)

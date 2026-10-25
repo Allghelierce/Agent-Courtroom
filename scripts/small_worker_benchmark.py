@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import dotenv_values
-from groq import Groq
+from groq import Groq, BadRequestError
 from groq.types.chat import ChatCompletion
 
 from advised_benchmark import ProgressBus
@@ -91,7 +91,8 @@ class ModelAdvisor:
         folder = self.out / "advice" / str(self.count)
         folder.mkdir(parents=True)
         started = time.monotonic()
-        record = {"source": "single_model_advisor", "model": ADVISOR_MODEL, "costComplete": False}
+        record = {"source": "single_model_advisor", "model": ADVISOR_MODEL, "costComplete": False,
+                  "requestErrors": []}
         try:
             source = {}
             for path in sorted(self.envs[0].root.rglob("*")):
@@ -107,16 +108,31 @@ class ModelAdvisor:
             (folder / "request.json").write_text(json.dumps(evidence, indent=2) + "\n")
             print(f"ADVISOR_START {packet['charge']['workerId']} step {packet['events'][-1]['step']}: "
                   + packet["charge"]["summary"], flush=True)
-            response = self.client.chat.completions.create(
-                model=ADVISOR_MODEL, messages=[{"role": "system", "content": ADVISOR_SYSTEM},
-                    {"role": "user", "content": json.dumps(evidence)}],
-                response_format={"type": "json_object"}, max_completion_tokens=4096,
-            )
+            for attempt in range(2):
+                try:
+                    response = self.client.chat.completions.create(
+                        model=ADVISOR_MODEL, messages=[{"role": "system", "content": ADVISOR_SYSTEM},
+                            {"role": "user", "content": json.dumps(evidence)}],
+                        response_format={"type": "json_object"}, max_completion_tokens=4096,
+                        timeout=max(.1, 120 - (time.monotonic() - started)),
+                    )
+                    break
+                except BadRequestError as exc:
+                    body = getattr(exc, "body", None)
+                    error = body.get("error", body) if isinstance(body, dict) else {}
+                    code = error.get("code") if isinstance(error, dict) else None
+                    self.complete = False  # Missing failed-request usage is never free.
+                    record["requestErrors"].append({"attempt": attempt + 1, "code": code,
+                                                   "type": type(exc).__name__})
+                    if (attempt or code not in ("json_validate_failed", "tool_use_failed", "output_parse_failed")
+                            or time.monotonic() - started >= 120):
+                        raise
+                    print("ADVISOR_RETRY " + str(code), flush=True)
             usage = response.usage
             cached = getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", 0) or 0
             cost = ((usage.prompt_tokens - cached) * .15 + cached * .075 + usage.completion_tokens * .60) / 1e6
             self.cost += cost
-            complete = response.model == ADVISOR_MODEL
+            complete = response.model == ADVISOR_MODEL and not record["requestErrors"]
             self.complete &= complete
             record.update(model=response.model, usage=usage.model_dump(), costUsd=cost,
                           costComplete=complete, rawResponse=response.choices[0].message.content)
@@ -127,6 +143,10 @@ class ModelAdvisor:
             if not record.get("costComplete"):
                 self.complete = False
             record["errorType"] = type(exc).__name__
+            body = getattr(exc, "body", None)
+            if isinstance(body, dict):
+                error = body.get("error", body)
+                record["errorCode"] = error.get("code") if isinstance(error, dict) else None
             verdict = Verdict(ruling="halt", reasoning=f"Advisor failed ({type(exc).__name__}); no substitute advice")
         elapsed = time.monotonic() - started
         self.seconds += elapsed

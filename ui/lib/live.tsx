@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 import type { Charge, Event, Trial } from "@court/types";
-import { COURT_URL, ENGINE_URL, KIND_LABEL, RULING_LABEL, describeEvent, eventFailed } from "./data";
+import { COURT_URL, ENGINE_URL, KIND_LABEL, RULING_LABEL, describeEvent, eventFailed, isClaudeSession } from "./data";
 import { DEMO_GAPS, DEMO_STREAM, DEMO_TRIALS, demoTrialId, type ComparisonResult, type StreamMessage, type VerdictMessage, type WorkerStatus } from "./stream";
 
 // One live picture of every worker, built from StreamMessages (shared/schema.ts). It comes from the engine's SSE
@@ -15,7 +15,7 @@ export type FeedItem = {
   seq: number;
   at: string;
   workerId: string;
-  tone: "event" | "fail" | "charge" | "verdict" | "done";
+  tone: "start" | "event" | "fail" | "charge" | "verdict" | "done";
   text: string;
   charge?: { workerId: string; id: number };
 };
@@ -57,12 +57,18 @@ function apply(state: RunState, msg: StreamMessage | { type: "reset" }): RunStat
     case "worker": {
       const d = msg.data;
       const w = worker(d.workerId);
+      const started = !state.workers[d.workerId] && !d.endedAt;
       const ended = d.endedAt && !w.status.endedAt;
+      const startText = `${isClaudeSession(d.workerId) ? "Session connected" : "Started"}${d.task ? `: ${d.task}` : ""}`;
       return {
         ...base,
         ...put(d.workerId, { ...w, status: d }),
         lastAt: d.endedAt ?? state.lastAt,
-        feed: ended ? feed({ workerId: d.workerId, tone: d.state === "succeeded" ? "done" : "fail", text: d.summary ?? d.state }, d.endedAt) : state.feed,
+        feed: ended
+          ? feed({ workerId: d.workerId, tone: d.state === "succeeded" ? "done" : "fail", text: d.summary ?? d.state }, d.endedAt)
+          : started
+            ? feed({ workerId: d.workerId, tone: "start", text: startText }, d.startedAt)
+            : state.feed,
       };
     }
     case "event": {

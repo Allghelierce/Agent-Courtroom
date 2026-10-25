@@ -6,7 +6,7 @@ Read this before you touch anything visual, so the dashboard, the courtroom and 
 
 **The courtroom is the face. The numbers prove it works.**
 
-- **The courtroom leads.** The dashboard opens on the courtroom scene: the live trial while court is in session, otherwise the latest intervention. Then the impact numbers (saved vs. unsupervised, interventions, cost of oversight), the with/without comparison, the monitor rules, the workers, the interventions table and the activity log.
+- **The courtroom leads.** The dashboard opens on the courtroom scene: the live trial while court is in session, otherwise the latest intervention, unless a worker (a Claude Code session) connected after it: then a green "Session connected" panel shows the court has picked it up. Then the impact numbers (saved vs. unsupervised, interventions, cost of oversight), the with/without comparison, the monitor rules, the workers, the interventions table and the activity log.
 - **Pixel chrome, readable data.** Every surface is pixel art: 4px borders, hard shadows, Jersey 10 headings, pixel buttons and tags. But text, numbers and tables are IBM Plex Sans with tabular figures, so the data reads like a real tool, not a game menu.
 - **Sharp by construction.** The page is 1064px wide so its content (1032px) is exactly the courtroom at 4x plus its frame, and the dashboard's scene sits at exactly 2x in a 520px column. Frames hug the canvas (`FramedScene`, `useIntegerScale`), so the art is never letterboxed or scaled by a fraction. Sections share one four-column rhythm: impact numbers, monitors, worker cards.
 - **The courtroom's own text stays in-world.** The dialogue box and the evidence pinned in the scene use DotGothic16 (the `.vn` class); cut-ins and the stamp use Jersey 10.

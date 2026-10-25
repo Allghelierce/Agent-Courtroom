@@ -7,7 +7,7 @@ import { FramedScene } from "@/components/CourtScene";
 import { Meter, PixelIcon, RulingTag, StatusTag, WarningLights } from "@/components/Pieces";
 import { NeedsHuman } from "@/components/NeedsHuman";
 import { Chibi } from "@/components/Sprites";
-import { CHARGE_PHRASE, KIND_LABEL, RULING_LABEL, STATE_LABEL, clock, describeEvent, usd, type Charge, type Ruling, type Trial } from "@/lib/data";
+import { CHARGE_PHRASE, KIND_LABEL, RULING_LABEL, STATE_LABEL, clock, describeEvent, isClaudeSession, usd, type Charge, type Ruling, type Trial } from "@/lib/data";
 import { useLive, type FeedItem, type LiveWorker } from "@/lib/live";
 import type { Mood } from "@/lib/sprites";
 import { DEMO_TRIALS, runCosts, savings, type ComparisonResult, type WorkerResult, type WorkerState } from "@/lib/stream";
@@ -15,9 +15,15 @@ import { DEMO_TRIALS, runCosts, savings, type ComparisonResult, type WorkerResul
 export default function Dashboard() {
   const live = useLive();
   const [selected, setSelected] = useState<string | null>(null);
+  const isLive = live.source !== "replay";
   const workers = live.order.map((id) => live.workers[id]);
+  // Live, the workers still running come first, newest first; a replay keeps the recorded run's order.
+  const grid = isLive ? workers.toSorted(byActiveThenNewest) : workers;
+  const connected = isLive ? grid.filter(isActive) : [];
   // Lead with the latest time the court stepped in; a "keep going" ruling only if there's nothing else.
   const latest = live.runTrials.findLast((t) => t.verdict.ruling !== "continue") ?? live.runTrials.at(-1);
+  // A worker that connected since then leads instead, so you can see the court picked it up.
+  const fresh = connected[0] && (!latest || startedMs(connected[0]) > Date.parse(latest.startedAt)) ? connected[0] : undefined;
   const [inSession, ...alsoInSession] = live.openCharges;
 
   return (
@@ -26,6 +32,8 @@ export default function Dashboard() {
       <NeedsHuman />
       {inSession ? (
         <InSession key={`${inSession.workerId}-${inSession.id}`} charge={inSession} trial={live.trialFor(inSession.workerId, inSession.id ?? 0)} others={alsoInSession} />
+      ) : fresh ? (
+        <Connected worker={fresh} others={connected.slice(1)} trial={latest} />
       ) : latest ? (
         <LatestCase trial={latest} />
       ) : (
@@ -43,11 +51,11 @@ export default function Dashboard() {
 
       <section aria-labelledby="workers-h" className="flex flex-col gap-4">
         <h2 id="workers-h" className="text-[30px]">Workers</h2>
-        {workers.length === 0 ? (
+        {grid.length === 0 ? (
           <p className="px-box m-0 p-6 text-soft">Waiting for the first worker to start...</p>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {workers.map((w) => (
+            {grid.map((w) => (
               <WorkerCard key={w.status.workerId} worker={w} selected={selected === w.status.workerId} onSelect={() => setSelected(selected === w.status.workerId ? null : w.status.workerId)} />
             ))}
           </div>
@@ -168,6 +176,46 @@ function LatestCase({ trial }: { trial: Trial }) {
 // The courtroom is always one click away: the recorded looping trial is the clearest example of what the court does.
 const SAMPLE_TRIAL = DEMO_TRIALS.find((t) => t.verdict.ruling === "change_strategy") ?? DEMO_TRIALS[0];
 
+const isActive = (w: LiveWorker) => !w.status.endedAt;
+const startedMs = (w: LiveWorker) => Date.parse(w.status.startedAt) || 0;
+function byActiveThenNewest(a: LiveWorker, b: LiveWorker): number {
+  return Number(!isActive(a)) - Number(!isActive(b)) || startedMs(b) - startedMs(a);
+}
+
+function Connected({ worker: w, others, trial }: { worker: LiveWorker; others: LiveWorker[]; trial?: Trial }) {
+  const s = w.status;
+  const session = isClaudeSession(s.workerId);
+  const example = trial ?? SAMPLE_TRIAL;
+  return (
+    <section className="px-box grid grid-cols-[minmax(0,1fr)] gap-6 p-4 md:p-6 lg:grid-cols-[520px_minmax(0,1fr)]" style={{ borderColor: "var(--green)" }} aria-labelledby="connected-h" aria-live="polite">
+      <SceneLink href={example && `/court/${example.id}`}>
+        <FramedScene speaker={null} moods={{ worker: "happy", judge: "happy" }} workerLabel={s.workerId} maxScale={2} />
+      </SceneLink>
+      <div className="flex flex-col justify-center gap-4">
+        <span className="px-tag self-start" style={{ background: "var(--green)", color: "var(--on-accent)" }}>
+          {session ? "Session connected" : "Worker started"}
+        </span>
+        <h1 id="connected-h" className="text-[40px]">
+          {s.workerId} is {session ? "connected" : "running"}
+        </h1>
+        {s.task && <p className="m-0 line-clamp-2">{s.task}</p>}
+        <p className="m-0 text-sm text-soft">
+          Step {s.step} · {usd(s.costUsd)} of {usd(s.budgetUsd)} spent. The monitors check every step for free, and the court convenes only if one flags this {session ? "session" : "worker"}.
+        </p>
+        {others.length > 0 && <p className="m-0 text-sm text-soft">Also connected: {others.map((o) => o.status.workerId).join(", ")}.</p>}
+        {example && (
+          <div className="flex flex-wrap gap-3">
+            <Link href={`/court/${example.id}`} className="px-btn ghost">
+              <PixelIcon name="gavel" />
+              {trial ? "Watch the latest trial" : "Watch a sample trial"}
+            </Link>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function QuietCourt() {
   const live = useLive();
   return (
@@ -209,12 +257,26 @@ function RunStatus() {
     replay: live.demoChosen ? "Recorded demo (the engine is running)" : "Demo replay of a recorded run",
   }[live.source];
   const dot = { connecting: "var(--soft)", live: "var(--green)", disconnected: "var(--amber)", replay: "var(--blue)" }[live.source];
+  // Live, say who's connected, so a new Claude Code session visibly registers.
+  const workerIds = Object.keys(live.workers);
+  const active = live.order.filter((id) => isActive(live.workers[id]));
+  const sessions = workerIds.length > 0 && workerIds.every(isClaudeSession);
+  const plural = active.length === 1 ? "" : "s";
+  const who =
+    live.source !== "live"
+      ? ""
+      : active.length > 0
+        ? `, ${active.length} ${sessions ? `Claude Code session${plural} connected` : `worker${plural} running`}`
+        : sessions
+          ? ", no Claude Code session connected"
+          : ", waiting for a worker to start";
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <span className="flex items-center gap-2 text-sm text-soft">
         <span aria-hidden className={`inline-block size-2.5 ${live.source === "live" ? "pulse-step" : ""}`} style={{ background: dot }} />
         {label}
+        {who}
         {live.source === "replay" ? `, ${Math.round(live.progress * 100)}%` : ""}
       </span>
       {(live.source === "live" || live.source === "disconnected") && (
@@ -547,6 +609,7 @@ function Interventions() {
 // ---------- activity ----------
 
 const TONE_COLOR: Record<FeedItem["tone"], string> = {
+  start: "var(--green)",
   event: "var(--edge)",
   fail: "var(--red)",
   charge: "var(--red)",

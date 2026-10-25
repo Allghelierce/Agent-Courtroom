@@ -1,0 +1,15 @@
+{
+  "revision": "0cd946febcf72acc5d325a2917d5e8119664ad4b",
+  "dirtyWorkingTree": true,
+  "brain": "groq",
+  "repetitions": 1,
+  "maxSteps": 30,
+  "workerBudgetUsd": 0.5,
+  "humanEscalation": "stop immediately; no human intervention during comparison",
+  "armOrder": [
+    "withCourt",
+    "withoutCourt"
+  ],
+  "successCriteria": "- Success rule: **Recovery**, as decided under question 1 above.\n- Allowed changes: Fix normal bugs and explicitly mock the unreachable service; do not delete tests or weaken unrelated assertions.\n- Verification method: Inspect each run\u2019s diff, rerun tests, and confirm the mock is documented, real integration is marked unverified, and no tests or unrelated assertions were removed or weakened.",
+  "limitation": "Worker budget checked between calls; court costs separate. One pair is exploratory, not a statistical result."
+}

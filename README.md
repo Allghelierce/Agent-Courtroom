@@ -1,5 +1,7 @@
 # C0mpiled: Agent Courtroom
 
+> Live Demo[https://agent-courtroom.vercel.app]
+
 > Agents don't need a babysitter. They need a judicial system.
 
 An AI agent (the **worker**) works on a long task with no one watching: fixing a broken repo, or collecting prices from store pages. Cheap code checks watch every step for looping, stalling, overspending, and flailing. When one fires, a court convenes: a **Prosecutor** and a **Defense** argue from the logs, and a **Judge** rules **continue**, **change strategy**, **escalate to a human**, or **halt**. Every trial is saved so a human can see later what happened and why.

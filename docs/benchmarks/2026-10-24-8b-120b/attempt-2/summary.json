@@ -1,0 +1,20 @@
+{
+  "withAdvisor": {
+    "state": "failed",
+    "modelTurns": 6,
+    "seconds": 2.97,
+    "advisorCalls": 0,
+    "totalCostUsd": null,
+    "checks": 5,
+    "stripeStatus": "not_run"
+  },
+  "withoutAdvisor": {
+    "state": "failed",
+    "modelTurns": 3,
+    "seconds": 1.462,
+    "advisorCalls": 0,
+    "totalCostUsd": 0.00012987,
+    "checks": 5,
+    "stripeStatus": "not_run"
+  }
+}

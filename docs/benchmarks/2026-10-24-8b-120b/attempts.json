@@ -1,0 +1,74 @@
+[
+  {
+    "attempt": 1,
+    "rawPath": "runs/benchmarks/20261025-020245-774192-8b-120b-pair",
+    "summary": {
+      "withAdvisor": {
+        "state": "halted",
+        "modelTurns": 3,
+        "seconds": 2.637,
+        "advisorCalls": 1,
+        "totalCostUsd": null,
+        "checks": 5,
+        "stripeStatus": "not_run"
+      },
+      "withoutAdvisor": {
+        "state": "failed",
+        "modelTurns": 3,
+        "seconds": 2.0,
+        "advisorCalls": 0,
+        "totalCostUsd": 0.00018348,
+        "checks": 5,
+        "stripeStatus": "not_run"
+      }
+    }
+  },
+  {
+    "attempt": 2,
+    "rawPath": "runs/benchmarks/20261025-020340-648693-8b-120b-pair",
+    "summary": {
+      "withAdvisor": {
+        "state": "failed",
+        "modelTurns": 6,
+        "seconds": 2.97,
+        "advisorCalls": 0,
+        "totalCostUsd": null,
+        "checks": 5,
+        "stripeStatus": "not_run"
+      },
+      "withoutAdvisor": {
+        "state": "failed",
+        "modelTurns": 3,
+        "seconds": 1.462,
+        "advisorCalls": 0,
+        "totalCostUsd": 0.00012987,
+        "checks": 5,
+        "stripeStatus": "not_run"
+      }
+    }
+  },
+  {
+    "attempt": 3,
+    "rawPath": "runs/benchmarks/20261025-020410-814914-8b-120b-pair",
+    "summary": {
+      "withAdvisor": {
+        "state": "failed",
+        "modelTurns": 1,
+        "seconds": 0.787,
+        "advisorCalls": 0,
+        "totalCostUsd": 6.062e-05,
+        "checks": 5,
+        "stripeStatus": "not_run"
+      },
+      "withoutAdvisor": {
+        "state": "failed",
+        "modelTurns": 5,
+        "seconds": 3.039,
+        "advisorCalls": 0,
+        "totalCostUsd": 0.00035637,
+        "checks": 5,
+        "stripeStatus": "not_run"
+      }
+    }
+  }
+]

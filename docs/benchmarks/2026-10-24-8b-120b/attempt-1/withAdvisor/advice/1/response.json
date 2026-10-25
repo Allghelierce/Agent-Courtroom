@@ -1,0 +1,12 @@
+{
+  "source": "single_model_advisor",
+  "model": "openai/gpt-oss-120b",
+  "costComplete": false,
+  "errorType": "BadRequestError",
+  "seconds": 0.7181687919983233,
+  "verdict": {
+    "ruling": "halt",
+    "reasoning": "Advisor failed (BadRequestError); no substitute advice",
+    "cited_events": []
+  }
+}

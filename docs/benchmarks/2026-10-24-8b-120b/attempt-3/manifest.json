@@ -1,0 +1,27 @@
+{
+  "revision": "62bdade1f9a23a8e42b037c50c6698ea7a4389b6",
+  "workerModel": "meta-llama/llama-3.1-8b-instruct",
+  "workerProvider": "OpenRouter/Groq",
+  "advisorModel": "openai/gpt-oss-120b",
+  "supervisionMode": "single_model_advisor",
+  "multiModelCourt": false,
+  "maxSteps": 100,
+  "workerBudgetUsd": 0.5,
+  "advisorBudgetUsd": 0.1,
+  "seedDigest": "9f5c9f0516fc797e68ad7155679079aceb01334a86082fb8c4ffd0b2f60553a8",
+  "workerRatesPerMillion": [
+    0.05,
+    0.08,
+    0.05,
+    0.05,
+    0.025
+  ],
+  "priceSource": "https://openrouter.ai/api/v1/models/meta-llama/llama-3.1-8b-instruct/endpoints",
+  "priceVerifiedAt": "2026-10-24",
+  "armOrder": [
+    "withAdvisor",
+    "withoutAdvisor"
+  ],
+  "pairs": 1,
+  "limitation": "Fresh stochastic attempts; one pair cannot establish a general effect."
+}

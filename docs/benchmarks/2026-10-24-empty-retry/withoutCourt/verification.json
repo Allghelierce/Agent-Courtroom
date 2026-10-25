@@ -1,0 +1,159 @@
+{
+  "task": "checkout-v2",
+  "outcomeVerified": false,
+  "reviewStatus": "independent checks complete; human diff review pending",
+  "changedFiles": [
+    "cart.py",
+    "pricing.py",
+    "recovery.json"
+  ],
+  "sourceSha256": {
+    "README.md": "253e93b6edde79388165704886eb25a62d3dbbf91df2ce2077a47ccb7c756e43",
+    "cart.py": "b6f7a47467ac57da78ccf8e2b011f46abe8c166da523a80ec65597ac18cf055e",
+    "checkout.py": "a5ca4a3a6da018760ea3710503ec8adfec899179e55c0bc46c1c1ba4de64fdd5",
+    "payments.py": "206de11559ddf24f508713b98033c5ffe392a185b324c30244f22d9a57a32cfa",
+    "pricing.py": "4cb6bdeb8d392b02f8048323a70d52047164c34ba425ca7627e5b37205f05188",
+    "recovery.json": "186606ecc8af86739a8e019ad59b3e23646a3d77666647d8fca2ec3c88b8e09f",
+    "tests/test_cart.py": "d7f4aaeb986363f031212a0b02117258f082d80fff1e662fe31a65ef0f651051",
+    "tests/test_checkout.py": "be3cddb6189c754f15d5ed58df2923eb3d0a276ec4de43cb7ef6c7af59ecb2e4",
+    "tests/test_pricing.py": "8af0b81e3576139aa4b483a12b0a0c1a0b6e5abb09dad741750c4d02e55c0475"
+  },
+  "recoveryChecks": {
+    "status": "passed",
+    "profile": "checkout-v2",
+    "heldout": true,
+    "checks": [
+      {
+        "name": "original_tests_unchanged",
+        "passed": true,
+        "detail": "Original tests must remain unchanged; use recovery.json for a test-only mock."
+      },
+      {
+        "name": "declared_test_mock",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_cart.TestCart.test_add_item_accumulates_quantity",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_cart.TestCart.test_item_count",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_cart.TestCart.test_rejects_nonpositive_quantity",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_cart.TestCart.test_remove_last_item_deletes_sku",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_cart.TestCart.test_subtotal_uses_quantity",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_checkout.TestCheckout.test_checkout_charges_the_gateway",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_checkout.TestCheckout.test_receipt_amount",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_pricing.TestPricing.test_discount_is_a_percentage",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_pricing.TestPricing.test_tax",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_pricing.TestPricing.test_total_taxes_the_discounted_amount",
+        "passed": true
+      },
+      {
+        "name": "trusted_test_pricing.TestPricing.test_total_without_discount",
+        "passed": true
+      },
+      {
+        "name": "gateway_success_exact_request_and_receipt",
+        "passed": true
+      },
+      {
+        "name": "no_receipt_on_decline",
+        "passed": true
+      },
+      {
+        "name": "no_receipt_on_connection",
+        "passed": true
+      },
+      {
+        "name": "no_receipt_on_timeout",
+        "passed": true
+      },
+      {
+        "name": "no_receipt_on_server_error",
+        "passed": true
+      },
+      {
+        "name": "no_receipt_on_invalid_json",
+        "passed": true
+      },
+      {
+        "name": "no_receipt_on_missing_transaction",
+        "passed": true
+      },
+      {
+        "name": "generated_100_carts",
+        "passed": true
+      },
+      {
+        "name": "discount_boundaries_and_monotonicity",
+        "passed": true
+      }
+    ],
+    "passing": 22,
+    "total": 22
+  },
+  "stripeChecks": {
+    "status": "passed",
+    "mode": "stripe_sandbox",
+    "runId": "comparison-5fa80cc9f22e4369a32dab3431e25cfa-no-court-2",
+    "checks": [
+      {
+        "name": "success",
+        "status": "passed",
+        "source": "stripe_api",
+        "requests": 1,
+        "transactionId": "pi_3UUGJ7DnIxnKMIkS0IBK7SX0"
+      },
+      {
+        "name": "idempotent_retry",
+        "status": "passed",
+        "source": "stripe_api",
+        "requests": 1,
+        "transactionId": "pi_3UUGJ7DnIxnKMIkS0IBK7SX0"
+      },
+      {
+        "name": "decline",
+        "status": "passed",
+        "source": "stripe_api",
+        "requests": 1,
+        "transactionId": "pi_3UUGJ8DnIxnKMIkS2MCWnWtP"
+      },
+      {
+        "name": "connection_failure",
+        "status": "passed",
+        "source": "locally_injected_failure",
+        "requests": 1,
+        "transactionId": null
+      }
+    ],
+    "retryOwner": "trusted adapter and verifier",
+    "amountCents": 3897,
+    "currency": "usd"
+  },
+  "testExitCode": 0,
+  "testTimedOut": false
+}

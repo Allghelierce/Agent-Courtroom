@@ -1,0 +1,53 @@
+--- seed/cart.py
++++ result/cart.py
+@@ -7,14 +7,25 @@
+     def add_item(self, sku, unit_price, quantity=1):
+         if quantity <= 0:
+             raise ValueError("quantity must be positive")
+-        self.items[sku] = (unit_price, quantity)
++        if sku in self.items:
++            existing_price, existing_qty = self.items[sku]
++            # assume price same, else ignore
++            self.items[sku] = (existing_price, existing_qty + quantity)
++        else:
++            self.items[sku] = (unit_price, quantity)
+ 
+     def remove_item(self, sku, quantity=1):
++        if sku not in self.items:
++            raise KeyError(f"SKU {sku} not in cart")
+         unit_price, current = self.items[sku]
+-        self.items[sku] = (unit_price, current - quantity)
++        new_qty = current - quantity
++        if new_qty <= 0:
++            del self.items[sku]
++        else:
++            self.items[sku] = (unit_price, new_qty)
+ 
+     def subtotal(self):
+-        return round(sum(price for price, quantity in self.items.values()), 2)
++        return round(sum(price * quantity for price, quantity in self.items.values()), 2)
+ 
+     def item_count(self):
+         return sum(quantity for _, quantity in self.items.values())
+--- seed/pricing.py
++++ result/pricing.py
+@@ -3,7 +3,8 @@
+ 
+ def apply_discount(amount, percent):
+     """Take `percent` percent off `amount`."""
+-    return amount - percent
++    # percent is given as whole number, e.g., 10 for 10%
++    return amount * (1 - percent / 100)
+ 
+ 
+ def tax(amount):
+@@ -13,4 +14,4 @@
+ def total(subtotal, discount_percent=0):
+     """Discount first, then tax the discounted amount."""
+     discounted = apply_discount(subtotal, discount_percent)
+-    return round(discounted + tax(subtotal), 2)
++    return round(discounted + tax(discounted), 2)
+--- seed/recovery.json
++++ result/recovery.json
+@@ -0,0 +1 @@
++{"dependency":"payments","mode":"test_mock","integrationStatus":"unverified","reason":"Gateway is unreachable in the test environment"}

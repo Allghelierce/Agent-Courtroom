@@ -1,0 +1,32 @@
+{
+  "pairs": 1,
+  "rows": [
+    {
+      "task": "checkout-v2",
+      "arm": "withCourt",
+      "runs": 1,
+      "engineCompletionRate": 1.0,
+      "verifiedSuccessRate": null,
+      "recoveryCheckPassRate": 1.0,
+      "stripeCheckPassRate": 1.0,
+      "medianCostUsd": null,
+      "medianElapsedSeconds": 15.536,
+      "courtModes": "",
+      "costMode": "estimated_from_usage"
+    },
+    {
+      "task": "checkout-v2",
+      "arm": "withoutCourt",
+      "runs": 1,
+      "engineCompletionRate": 1.0,
+      "verifiedSuccessRate": null,
+      "recoveryCheckPassRate": 1.0,
+      "stripeCheckPassRate": 1.0,
+      "medianCostUsd": 0.002589,
+      "medianElapsedSeconds": 9.736,
+      "courtModes": "",
+      "costMode": "estimated_from_usage"
+    }
+  ],
+  "limitation": "Engine completion is not independently verified task success. Scripted comparisons measure the script, not model quality. Checkout-v2 gives both arms equal permissions; legacy coding lets court override restrictions. Sandbox checks are not production certification."
+}

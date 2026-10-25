@@ -1,0 +1,53 @@
+--- seed/cart.py
++++ result/cart.py
+@@ -5,16 +5,32 @@
+         self.items = {}  # sku -> (unit_price, quantity)
+ 
+     def add_item(self, sku, unit_price, quantity=1):
++        """Add *quantity* of *sku* at *unit_price*.
++
++        If the SKU already exists the quantity is added to the existing
++        quantity.  A ``ValueError`` is raised for non‑positive quantities.
++        """
+         if quantity <= 0:
+             raise ValueError("quantity must be positive")
+-        self.items[sku] = (unit_price, quantity)
++        if sku in self.items:
++            existing_price, existing_qty = self.items[sku]
++            # keep the original price for simplicity; ignore price mismatches
++            self.items[sku] = (existing_price, existing_qty + quantity)
++        else:
++            self.items[sku] = (unit_price, quantity)
+ 
+     def remove_item(self, sku, quantity=1):
+         unit_price, current = self.items[sku]
+         self.items[sku] = (unit_price, current - quantity)
+ 
+     def subtotal(self):
+-        return round(sum(price for price, quantity in self.items.values()), 2)
++        """Return the subtotal (price × quantity) of all items.
++
++        The previous implementation only summed unit prices, which caused
++        the subtotal to ignore the quantity of each item.  The corrected
++        implementation multiplies each price by its quantity.
++        """
++        return round(sum(price * quantity for price, quantity in self.items.values()), 2)
+ 
+     def item_count(self):
+         return sum(quantity for _, quantity in self.items.values())
+--- seed/pricing.py
++++ result/pricing.py
+@@ -2,8 +2,11 @@
+ 
+ 
+ def apply_discount(amount, percent):
+-    """Take `percent` percent off `amount`."""
+-    return amount - percent
++    """Take ``percent`` percent off ``amount``.
++
++    ``percent`` is expressed as a number such as ``10`` for ten percent.
++    """
++    return amount * (1 - percent / 100)
+ 
+ 
+ def tax(amount):

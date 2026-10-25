@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 import type { Charge, Event, Trial } from "@court/types";
-import { COURT_URL, ENGINE_URL, KIND_LABEL, RULING_LABEL, describeEvent, eventFailed } from "./data";
+import { COURT_URL, ENGINE_URL, KIND_LABEL, RECORDED_DEMO, RULING_LABEL, describeEvent, eventFailed } from "./data";
 import { DEMO_GAPS, DEMO_STREAM, DEMO_TRIALS, demoTrialId, type ComparisonResult, type StreamMessage, type VerdictMessage, type WorkerStatus } from "./stream";
 
 // One live picture of every worker, built from StreamMessages (shared/schema.ts). It comes from the engine's SSE
@@ -111,6 +111,7 @@ function apply(state: RunState, msg: StreamMessage | { type: "reset" }): RunStat
 function useCourtCases(): Trial[] {
   const [cases, setCases] = useState<Trial[]>([]);
   useEffect(() => {
+    if (RECORDED_DEMO) return;
     let alive = true;
     let timer: ReturnType<typeof setTimeout>;
     const load = async () => {
@@ -160,7 +161,7 @@ const LiveContext = createContext<LiveValue | null>(null);
 
 export function LiveProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(apply, EMPTY);
-  const [source, setSource] = useState<Source>("connecting");
+  const [source, setSource] = useState<Source>(RECORDED_DEMO ? "replay" : "connecting");
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(2);
   const [index, setIndex] = useState(0);
@@ -168,6 +169,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
 
   // Try the engine's stream first; fall back to the bundled replay if it isn't up.
   useEffect(() => {
+    if (RECORDED_DEMO) return;
     const es = new EventSource(`${ENGINE_URL}/stream`);
     let opened = false;
     const timer = setTimeout(() => {

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import { CourtScene } from "@/components/CourtScene";
 import { PixelIcon, RulingTag, StatusTag } from "@/components/Pieces";
 import { Portrait } from "@/components/Sprites";
-import { CHARGE_PHRASE, COURT_URL, ENGINE_URL, RULING_COLOR, RULING_LABEL, describeEvent, eventFailed, usd, type Event, type Trial } from "@/lib/data";
+import { CHARGE_PHRASE, COURT_URL, ENGINE_URL, RECORDED_DEMO, RULING_COLOR, RULING_LABEL, describeEvent, eventFailed, usd, type Event, type Trial } from "@/lib/data";
 import { useLive } from "@/lib/live";
 import { buildScript, type Line } from "@/lib/script";
 import { blip, gavel, objection, setSoundEnabled } from "@/lib/sound";
@@ -43,6 +43,10 @@ export function Courtroom() {
   // A case that isn't in the list yet (just convened) can still be opened directly: ask the court, then the engine.
   useEffect(() => {
     if (known) return;
+    if (RECORDED_DEMO) {
+      setLookup({ id, trial: null });
+      return;
+    }
     const get = (base: string) =>
       fetch(`${base}/cases/${encodeURIComponent(id)}`, { signal: AbortSignal.timeout(2000) })
         .then((r) => (r.ok ? (r.json() as Promise<Trial>) : null))

@@ -178,7 +178,7 @@ function RunStatus() {
     connecting: "Connecting to the engine...",
     live: "Live from the engine",
     disconnected: "Disconnected from the engine, showing the last data received",
-    replay: "Demo replay of a recorded run",
+    replay: "Scripted demo replay · simulated costs",
   }[live.source];
   const dot = { connecting: "var(--soft)", live: "var(--green)", disconnected: "var(--amber)", replay: "var(--blue)" }[live.source];
 
@@ -229,12 +229,12 @@ function Impact() {
   return (
     <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Impact">
       <Figure
-        label="Saved vs. running unsupervised"
+        label={cmp?.costMode === "simulated" ? "Simulated savings vs. unsupervised" : "Cost difference vs. unsupervised"}
         value={saved ? usd(saved.usd) : cmp ? "Incomplete" : "–"}
         accent={saved && saved.usd > 0 ? "var(--green)" : undefined}
         detail={
           saved && cmp
-            ? `${Math.round(saved.percent)}% less than the same task without the court, which ${cmp.withoutCourt.state === "succeeded" ? "also finished" : "never finished"}.`
+            ? `${Math.abs(Math.round(saved.percent))}% ${saved.usd < 0 ? "more" : "less"} than the run without the court.${cmp.costMode === "simulated" ? " Scripted example; no measured savings." : " Observed in this comparison only."}`
             : cmp
               ? "Some court costs weren't reported, so the total is incomplete."
               : "Appears when the same task, run without the court, finishes."
@@ -296,10 +296,13 @@ function ComparisonPanel({ comparison, error }: { comparison?: ComparisonResult;
           {comparison.costMode === "simulated" && <span className="px-tag" style={{ background: "var(--inset)", color: "var(--soft)" }}>Simulated costs</span>}
         </div>
         <p className="m-0 font-semibold" style={{ color: "var(--gold)" }}>
-          {saved === null ? "Savings incomplete: some court costs weren't reported" : saved.usd > 0 ? `The court saved ${usd(saved.usd)} (${Math.round(saved.percent)}%)` : "Same cost either way"}
+          {saved === null ? "Cost difference unavailable: some costs weren't reported" : saved.usd === 0 ? "Same recorded cost either way" : `${comparison.costMode === "simulated" ? "Simulated" : "Recorded"} cost: ${usd(Math.abs(saved.usd))} (${Math.abs(Math.round(saved.percent))}%) ${saved.usd > 0 ? "less" : "more"} with court`}
           {a.state === "succeeded" && b.state !== "succeeded" ? " and the task finished" : ""}
         </p>
       </div>
+      {comparison.costMode === "simulated" && (
+        <p className="m-0 text-sm text-soft">Scripted example with simulated costs. Real courtroom savings have not been established.</p>
+      )}
       <RunRow label="With the court" run={a} scale={scale} />
       <RunRow label="Without the court" run={b} scale={scale} />
     </section>

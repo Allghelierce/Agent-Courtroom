@@ -14,6 +14,33 @@ npm run dev        # http://localhost:3000
 
 The whole run lives in `lib/live.tsx`, mounted in the root layout, so it keeps playing while you watch a trial.
 
+## Deploy the recorded workflow
+
+```sh
+npm ci
+npm run build:demo
+```
+
+For Vercel, import this repository and set **Root Directory** to `ui`, use
+**Node.js 24.x**, and enable **Include source files outside of the Root
+Directory in the Build Step**. The UI imports types from `court/` and `shared/`.
+`ui/vercel.json` selects `npm ci`, `npm run build:demo`, and the `out` output
+directory. These settings follow Vercel's [build configuration](https://vercel.com/docs/builds/configure-a-build)
+and [monorepo guidance](https://vercel.com/docs/monorepos/monorepo-faq).
+
+The generated `out/` directory also works on other static hosts. This build starts the
+bundled replay immediately and never connects to the engine or court. It includes
+the dashboard, case log, all three trial URLs and their Record tabs. No API keys
+are required. Worker costs and comparison savings are simulated; this demo does
+not establish real courtroom savings. The normal `build`, `dev` and `start`
+commands retain live-service support.
+
+Suggested walkthrough: start on the dashboard, choose 4x, open the case log,
+replay `/court/demo-worker-1-3/` (change strategy), and switch to its Record tab
+to inspect the cited events. The other cases demonstrate continue and halt.
+Human escalation and the newer real-model/Stripe experiments are not part of
+this bundled recording; their evidence remains in the repository's `docs/`.
+
 ## Refreshing the bundled demo
 
 When `court/fixtures/stream-demo-4workers.jsonl` or the court's mock changes:

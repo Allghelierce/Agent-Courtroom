@@ -10,7 +10,25 @@ export type VerdictMessage = Extract<StreamMessage, { type: "verdict" }>["data"]
 
 // The bundled demo (refreshed with `npm run sync-data`): the court's 4-worker stream, and a mock trial per charge.
 // It predates some newer fields (sequence, cost breakdowns, a comparison id), so readers treat those as optional.
-export const DEMO_STREAM = demoStream as unknown as StreamMessage[];
+// The original fixture predates costMode. Preserve its numbers, but make their
+// simulated origin explicit even after the fixture is regenerated.
+export const DEMO_STREAM: StreamMessage[] = (demoStream as unknown as StreamMessage[]).map((message) => {
+  if (message.type === "worker") {
+    return { ...message, data: { ...message.data, costMode: "simulated" } };
+  }
+  if (message.type === "comparison") {
+    return {
+      ...message,
+      data: {
+        ...message.data,
+        costMode: "simulated",
+        withCourt: { ...message.data.withCourt, costMode: "simulated", outcomeVerified: false },
+        withoutCourt: { ...message.data.withoutCourt, costMode: "simulated", outcomeVerified: false },
+      },
+    };
+  }
+  return message;
+});
 export const DEMO_TRIALS = demoTrials as Trial[];
 
 export function demoTrialId(workerId: string, chargeId: number): string {

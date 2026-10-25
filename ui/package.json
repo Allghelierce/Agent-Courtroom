@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:demo": "NEXT_PUBLIC_DEMO_MODE=recorded next build",
     "start": "next start",
     "lint": "eslint",
     "sync-data": "node scripts/sync-data.mjs"

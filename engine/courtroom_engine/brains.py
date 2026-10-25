@@ -107,7 +107,7 @@ class GroqBrain:
         rates = model_rates(model)
         if rates is None:
             raise ValueError(f"No price for model {model}; update shared/model-prices.json")
-        self.price_in, self.price_out = rates[:2]
+        self.price_in, self.price_out, self.price_cached = rates[0], rates[1], rates[4]
         self.tools = [
             {
                 "type": "function",
@@ -142,11 +142,29 @@ class GroqBrain:
             for i, m in enumerate(self.messages)
         ]
 
+    def _cost(self, prompt_tokens: int, completion_tokens: int, cached_tokens: int = 0) -> float:
+        return ((prompt_tokens - cached_tokens) * self.price_in + cached_tokens * self.price_cached
+                + completion_tokens * self.price_out) / 1_000_000
+
+    def _failed_call(self, e, request: list[dict[str, Any]]) -> Action:
+        # Retain a rough estimate for the budget meter when errors omit usage. It is
+        # not provider-reported usage: mark totals incomplete instead of claiming savings.
+        body = getattr(e, "body", None)
+        error = body.get("error", body) if isinstance(body, dict) else {}
+        generated = (error.get("failed_generation") if isinstance(error, dict) else None) or ""
+        prompt_tokens = len(json.dumps(request)) // 4 + len(json.dumps(self.tools)) // 4
+        completion_tokens = len(generated) // 4
+        return Action(tool="invalid_tool_call", error=f"Malformed tool call: {str(e)[:300]}", model=self.model,
+                      tokens=prompt_tokens + completion_tokens, cost_usd=self._cost(prompt_tokens, completion_tokens),
+                      usage={"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "estimated": True},
+                      cost_complete=False)
+
     def next_action(self) -> Action:
+        request = self._request_messages()
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
-                messages=self._request_messages(),
+                messages=request,
                 tools=self.tools,
                 tool_choice="auto",
                 max_completion_tokens=4096,  # may count against the per-minute token limit
@@ -157,14 +175,15 @@ class GroqBrain:
             if "tool_use_failed" not in str(e):
                 raise
             self._pending = None
-            return Action(tool="invalid_tool_call", error=f"Malformed tool call: {str(e)[:300]}", model=self.model, cost_complete=False)
+            return self._failed_call(e, request)
         except self.groq.APIStatusError as e:
             if e.status_code == 413:
                 raise RuntimeError(f"Request too large for Groq's per-minute token limit: {e}") from e
             raise
 
         usage = response.usage
-        cost = (usage.prompt_tokens * self.price_in + usage.completion_tokens * self.price_out) / 1_000_000
+        details = getattr(usage, "prompt_tokens_details", None)
+        cost = self._cost(usage.prompt_tokens, usage.completion_tokens, getattr(details, "cached_tokens", None) or 0)
         accounting = {"usage": usage.model_dump(), "model": response.model, "cost_complete": response.model == self.model}
         message = response.choices[0].message
         calls = message.tool_calls or []

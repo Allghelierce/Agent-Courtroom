@@ -38,7 +38,7 @@ Keep the actual termination reason too: timeout, budget exhausted, halt, or awai
 
 - Success rule: **Recovery**, as decided under question 1 above.
 - Allowed changes: Fix normal bugs and explicitly mock the unreachable service; do not delete tests or weaken unrelated assertions.
-- Verification method: _not decided yet_
+- Verification method: Inspect each run’s diff, rerun tests, and confirm the mock is documented, real integration is marked unverified, and no tests or unrelated assertions were removed or weakened.
 
 ## 2. How should stored events behave after a crash?
 

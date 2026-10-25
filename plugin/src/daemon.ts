@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { buildPacket, holdTrial, listTrials, saveTrial, type Charge, type Event, type Trial, type Verdict } from "../../court/src/index.ts";
 import { TranscriptMeter, type PriceList } from "./cost.ts";
 import { mapToolCall, type HookToolInput } from "./map.ts";
-import { check, DEFAULT_CONFIG } from "./monitors.ts";
+import { check, SESSION_CONFIG } from "./monitors.ts";
 
 type WorkerState = "running" | "on_trial" | "awaiting_human" | "succeeded" | "halted" | "failed";
 type WorkerStatus = {
@@ -69,7 +69,6 @@ export type DaemonOptions = {
 };
 
 const PACKET_EVENTS = 20; // as engine/courtroom_engine/court.py
-const COURT_CFG = { ...DEFAULT_CONFIG, progressRequired: true };
 
 const now = () => new Date().toISOString();
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
@@ -276,7 +275,7 @@ export function createDaemon(opts: DaemonOptions = {}) {
       publishStatus(w);
       if (s.state !== "running" || !s.courtEnabled) return undefined;
 
-      const finding = check(w.events.slice(w.windowStart), s.budgetUsd, COURT_CFG);
+      const finding = check(w.events.slice(w.windowStart), s.budgetUsd, SESSION_CONFIG);
       if (!finding) return undefined;
       return trial(w, { id: nextChargeId++, workerId: s.workerId, ...finding }, eventName);
     });

@@ -72,8 +72,8 @@ Claude then follows the order. Delete `~/court-demo` when you're done.
 
 **What triggers a trial:**
 
-- **Looping:** the same action with the same result, 3 times within 10 steps.
-- **Stalling:** passing tests haven't gone up in 8 steps. This only applies once tests have run.
+- **Looping:** the same failing action with the same result, 3 times within 10 steps. Small differences in a command don't count, such as `2>&1`, `| tail`, `-v`, or a `cd` in front. Rerunning a check that passes doesn't count either.
+- **Stalling:** Claude has run the same test suite at least twice in 8 steps, tests are still failing, and the passing count hasn't gone up.
 - **Flailing:** 3 tool errors in a row, or the same error 3 times.
 - **Overspending:** 80% of the session budget used ($5 by default).
 

@@ -119,7 +119,7 @@ class StripeSandbox:
             raise ValueError("attempt_id must be a stable ID of 1–180 letters, digits, underscores, or hyphens")
         intent = self._request("POST", self.API, {
             "amount": amount_cents, "currency": "usd", "payment_method": payment_method,
-            "payment_method_types[]": "card", "confirm": "true", "error_on_requires_action": "true",
+            "allowed_payment_method_types[]": "card", "confirm": "true", "error_on_requires_action": "true",
             "description": "Agent Courtroom sandbox integration check",
             "metadata[integration]": "agent-courtroom-sandbox", "metadata[attempt_id]": attempt_id,
         }, idempotency_key="courtroom-" + attempt_id)

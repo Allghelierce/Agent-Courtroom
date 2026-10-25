@@ -33,7 +33,8 @@ class StripeSandboxTests(unittest.TestCase):
         self.assertEqual(fields["amount"], ["3897"])
         self.assertEqual(fields["currency"], ["usd"])
         self.assertEqual(fields["confirm"], ["true"])
-        self.assertEqual(fields["payment_method_types[]"], ["card"])
+        self.assertEqual(fields["allowed_payment_method_types[]"], ["card"])
+        self.assertNotIn("payment_method_types[]", fields)
 
     def test_retry_reuses_idempotency_key_and_retrieval_checks_provider(self):
         gateway, requests = self.gateway()

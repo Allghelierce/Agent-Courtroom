@@ -1,5 +1,21 @@
 # Test a functioning payment API with Stripe
 
+## Verified October 24, 2026
+
+10 offline regression tests and all five sandbox smoke checks passed. The success,
+idempotent retry, retrieval, and decline checks contacted Stripe's actual sandbox
+API. The connection-failure check was injected locally. No real funds moved.
+
+The successful USD 38.97 test payment is `pi_3UUEzjDnIxnKMIkS48sKOoK4`.
+Find it in the same sandbox's Payments view. See the saved
+[verification report](stripe-sandbox-result.json) for the payment references and checks.
+
+The initial request was rejected because `payment_method_types` is no longer
+supported by this account's API. The adapter now uses the documented
+`allowed_payment_method_types` field. Offline request tests cover that field.
+
+## Scope
+
 This optional integration calls Stripe's actual sandbox API. It tests payment
 confirmation and failure handling without moving money. It accepts a precomputed
 USD order total; it does not test cart arithmetic or approve the worker-generated

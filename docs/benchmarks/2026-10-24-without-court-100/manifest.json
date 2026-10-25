@@ -1,0 +1,15 @@
+{
+  "revision": "a3a4edb2219dcf92493b23c05525e916b8c9badf",
+  "dirtyWorkingTree": false,
+  "arm": "withoutCourt",
+  "freshStart": true,
+  "brain": "groq",
+  "model": "openai/gpt-oss-20b",
+  "maxSteps": 100,
+  "workerBudgetUsd": 0.5,
+  "seedSource": "seed_repos/checkout_hard",
+  "seedDigest": "9f5c9f0516fc797e68ad7155679079aceb01334a86082fb8c4ffd0b2f60553a8",
+  "court": "none",
+  "successCriteria": "- Success rule: Pass all 22 independent checkout recovery checks; report the four Stripe sandbox checks separately. Human review remains separate. Court intervention is an observed outcome, not forced or guaranteed.\n- Allowed changes: Fix source defects and declare the documented test-only mock in recovery.json. Original tests are read-only. Never fabricate receipts, swallow gateway failures, or change the gateway URL. Both arms have identical tools, permissions and empty-response retries.\n- Verification method: Freeze the same harder seed for both arms; preserve all steps and real trials, run independent verification on saved code, then Stripe sandbox checks only after recovery passes. Count all failures and unknown usage.",
+  "limitation": "One fresh unassisted attempt; not a continuation of the previous 30-turn worker or a matched 100-turn pair."
+}

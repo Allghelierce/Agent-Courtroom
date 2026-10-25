@@ -1,0 +1,15 @@
+{
+  "state": "succeeded",
+  "step": 28,
+  "modelTurns": 28,
+  "seconds": 38.041,
+  "totalCostUsd": null,
+  "summary": "Finished at 20/20 done after 28 steps",
+  "caseIds": [],
+  "recoveryChecks": {
+    "status": "passed",
+    "passing": 22,
+    "total": 22
+  },
+  "stripeStatus": "passed"
+}

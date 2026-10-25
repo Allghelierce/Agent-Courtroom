@@ -52,6 +52,7 @@ class Worker:
         self.evidence_dir = evidence_dir
         self.evidence_error = None
         self.verification = None
+        self.model_turns = 0
         self.human_wait_seconds = human_wait_seconds
         self.events: list[Event] = []
         self.window_start = 0  # monitors only see events after the last ruling
@@ -97,6 +98,7 @@ class Worker:
     def result(self) -> dict:
         status = self.status.to_json()
         return {**status, "seconds": round(self.elapsed_seconds(), 3),
+                "modelTurns": self.model_turns,  # excludes transparent SDK HTTP retries
                 "workerCostUsd": round(self.status.costUsd, 6),
                 "totalCostUsd": round(self.status.costUsd + self.status.courtCostUsd, 6) if self.status.courtCostComplete and self.status.workerCostComplete else None,
                 "caseIds": sorted(self.case_ids), "courtModes": sorted(self.court_modes),
@@ -158,6 +160,7 @@ class Worker:
             if self.status.costUsd >= self.budget_usd:
                 return self._finish("failed", f"Ran out of budget (${self.budget_usd:.2f}) at {self._score()}")
 
+            self.model_turns += 1
             action = self.brain.next_action()
             self.status.costUsd += action.cost_usd
             self.status.workerCostComplete &= action.cost_complete

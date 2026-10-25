@@ -1,8 +1,5 @@
 import json
-import shutil
-import tempfile
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 
 from courtroom_engine.tasks.coding import FIXES, TASK
@@ -79,6 +76,24 @@ class CheckoutVerificationTests(unittest.TestCase):
         self.assertEqual(public["status"], "passed")
         self.assertEqual(public["total"], 20)
         self.assertNotIn("generated_100_carts", {c["name"] for c in public["checks"]})
+
+    def test_batch_read_returns_all_eight_files_without_truncation(self):
+        paths = [str(p.relative_to(self.env.root)) for p in sorted(self.env.root.rglob("*"))
+                 if p.is_file() and p.name != "recovery.json"]
+        self.assertEqual(len(paths), 8)
+        result = self.env.execute("read_files", {"paths": paths})
+        self.assertIsNone(result.error)
+        for path in paths:
+            self.assertIn(f"--- {path} ---\n" + (self.env.root / path).read_text(), result.output)
+
+    def test_batch_reads_reject_escape_missing_oversized_and_invalid_inputs(self):
+        (self.env.root / "large.txt").write_text("x" * 6001)
+        for paths in ([], "cart.py", [None], ["cart.py"] * 2, ["../outside"],
+                      ["cart.py", "missing.py"], ["large.txt"], [str(i) for i in range(9)]):
+            with self.subTest(paths=paths):
+                result = self.env.execute("read_files", {"paths": paths})
+                self.assertIsNotNone(result.error)
+                self.assertNotIn("class Cart", result.output)
 
 
 if __name__ == "__main__":

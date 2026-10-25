@@ -27,6 +27,14 @@ held-out checks exercise 100 generated carts and discount boundaries. Missing,
 malformed, or timed-out grader output is an error, never success. Tests are
 outside the editable workspace, and saved test files must match the frozen seed.
 
+The worker can read up to eight files together with `read_files`. Complete batches
+are limited to 6000 characters; oversized batches fail with a request to split
+them, rather than silently losing files. Both arms get the same tool and guidance.
+`modelTurns` counts worker model calls, including invalid responses, but excludes
+automatic HTTP retries inside the provider SDK. One batched read remains one
+worker step, so time-to-stall in terms of files can change; this is part of the
+batching intervention. Historical runs used individual reads.
+
 The Stripe verifier configures the saved payment module's gateway URL to a local
 bridge. It does not replace the checkout or charge functions. The bridge calls
 the existing Stripe adapter, and the verifier checks the receipt against a GET

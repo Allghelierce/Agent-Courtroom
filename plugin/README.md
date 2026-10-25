@@ -1,5 +1,7 @@
 # Courtroom for Claude Code
 
+**New here? Start with the [user guide](USER_GUIDE.md).**
+
 Supervises your Claude Code sessions. After every tool call, cheap code checks (the engine's monitors, with no model calls) look for **looping**, **stalling**, **flailing**, and **overspending**. When one fires, a Prosecutor, a Defense, and a Judge review the evidence, and the ruling goes straight back to Claude:
 
 | Ruling | What happens |

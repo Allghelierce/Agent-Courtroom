@@ -1,6 +1,6 @@
 # C0mpiled: Agent Courtroom
 
-> Live Demo[https://agent-courtroom.vercel.app]
+> Live Demo[https://duckduckgo.com](https://agent-courtroom.vercel.app]
 
 > Agents don't need a babysitter. They need a judicial system.
 

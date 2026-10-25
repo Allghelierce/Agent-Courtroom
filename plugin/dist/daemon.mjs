@@ -50888,11 +50888,13 @@ data: ${JSON.stringify(msg)}
       }
     }
   }
+  const folderOf = (input2) => basename(input2.cwd ?? "session") || "session";
+  const workerIdOf = (input2) => `claude-code:${folderOf(input2)}:${input2.session_id.slice(0, 6)}`;
   function workerFor(input2) {
     let w = workers.get(input2.session_id);
     if (w) return w;
-    const folder = basename(input2.cwd ?? "session") || "session";
-    const workerId = `claude-code:${folder}:${input2.session_id.slice(0, 6)}`;
+    const folder = folderOf(input2);
+    const workerId = workerIdOf(input2);
     const prior = history.filter((m) => m.data.workerId === workerId);
     const lastStatus = [...prior].reverse().find((m) => m.type === "worker")?.data;
     const events = prior.filter((m) => m.type === "event").map((m) => m.data);
@@ -51089,8 +51091,9 @@ Stop now. Don't call more tools; explain the situation to the user and ask how t
     }
   }
   function sessionEnd(input2) {
-    const w = workers.get(input2.session_id);
-    if (!w) return void 0;
+    const known = workers.has(input2.session_id) || history.some((m) => m.type === "worker" && m.data.workerId === workerIdOf(input2));
+    if (!known) return void 0;
+    const w = workerFor(input2);
     const s = w.status;
     if (s.state !== "halted") {
       const tested = s.testsTotal > 0;

@@ -134,11 +134,14 @@ export function createDaemon(opts: DaemonOptions = {}) {
     }
   }
 
+  const folderOf = (input: HookInput) => basename(input.cwd ?? "session") || "session";
+  const workerIdOf = (input: HookInput) => `claude-code:${folderOf(input)}:${input.session_id.slice(0, 6)}`;
+
   function workerFor(input: HookInput): Worker {
     let w = workers.get(input.session_id);
     if (w) return w;
-    const folder = basename(input.cwd ?? "session") || "session";
-    const workerId = `claude-code:${folder}:${input.session_id.slice(0, 6)}`;
+    const folder = folderOf(input);
+    const workerId = workerIdOf(input);
     // A session seen before this daemon started: rebuild its events from the stream log.
     const prior = history.filter((m) => (m.data as { workerId?: string }).workerId === workerId);
     const lastStatus = [...prior].reverse().find((m) => m.type === "worker")?.data as WorkerStatus | undefined;
@@ -347,8 +350,10 @@ export function createDaemon(opts: DaemonOptions = {}) {
   }
 
   function sessionEnd(input: HookInput) {
-    const w = workers.get(input.session_id);
-    if (!w) return undefined;
+    // The daemon may have restarted mid-session: close out a session it only knows from the stream log too.
+    const known = workers.has(input.session_id) || history.some((m) => m.type === "worker" && (m.data as WorkerStatus).workerId === workerIdOf(input));
+    if (!known) return undefined;
+    const w = workerFor(input);
     const s = w.status;
     if (s.state !== "halted") {
       const tested = s.testsTotal > 0;

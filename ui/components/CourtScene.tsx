@@ -2,7 +2,7 @@
 
 import { useCallback, useRef } from "react";
 import { CHIBI_W, SCENE_H, SCENE_W, STAGE, chibi, gavel, sceneBack, sceneBench, sceneFront, type CastKey, type Mood } from "@/lib/sprites";
-import { PixelCanvas } from "./PixelCanvas";
+import { PixelCanvas, useIntegerScale } from "./PixelCanvas";
 
 type Actor = Exclude<CastKey, "clerk">;
 type Props = {
@@ -12,13 +12,14 @@ type Props = {
   gavelDown?: boolean;
   workerLabel?: string;
   maxScale?: number;
+  scale?: number; // a fixed whole-number scale (see FramedScene); otherwise it fits its container up to maxScale
 };
 
 const ACTORS: Actor[] = ["judge", "pros", "def", "worker"]; // for the mood cache key
 const GOLD = "#f7c948";
 const INK = "#120c22";
 
-export function CourtScene({ speaker, moods = {}, swirl = false, gavelDown = false, workerLabel = "a worker", maxScale = 6 }: Props) {
+export function CourtScene({ speaker, moods = {}, swirl = false, gavelDown = false, workerLabel = "a worker", maxScale = 6, scale }: Props) {
   // Static layers and sprites are built once per mood on the client and reused every frame.
   const cache = useRef(new Map<string, HTMLCanvasElement>());
   const gavelHit = useRef<number | null>(null); // the tick the gavel came down, for its sparks
@@ -106,7 +107,20 @@ export function CourtScene({ speaker, moods = {}, swirl = false, gavelDown = fal
       render={render}
       animate
       maxScale={maxScale}
+      scale={scale}
       label={`Pixel-art courtroom: Judge Haku at the bench, Prosecutor Aka on the left, Defense Aoi on the right, and ${workerLabel} on the witness stand`}
     />
+  );
+}
+
+// The courtroom in a frame that hugs it: always a whole-number scale, never letterboxed.
+export function FramedScene({ maxScale = 2, ...props }: Omit<Props, "scale">) {
+  const [ref, scale] = useIntegerScale(SCENE_W, maxScale, 8);
+  return (
+    <div ref={ref} className="w-full">
+      <div className="mx-auto w-fit border-4 border-edge bg-[#2a1d4a]">
+        <CourtScene {...props} scale={scale} />
+      </div>
+    </div>
   );
 }

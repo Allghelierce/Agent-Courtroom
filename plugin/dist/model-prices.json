@@ -1,0 +1,33 @@
+{
+  "verifiedAt": "2026-10-24",
+  "scope": "Standard first-party API USD per million tokens; estimated usage cost, excluding taxes and special service tiers",
+  "fields": ["input", "output", "cacheWrite5m", "cacheWrite1h", "cacheRead"],
+  "providers": {
+    "claude": {"source": "https://platform.claude.com/docs/en/about-claude/pricing", "verifiedAt": "2026-10-24"},
+    "groq": {
+      "source": "https://console.groq.com/docs/prompt-caching",
+      "verifiedAt": "2026-10-24",
+      "note": "List-price estimate before free-tier credits; not an invoice. Groq has no cache-write premium (cache writes cost the input rate) and discounts cached input 50%."
+    }
+  },
+  "modelProviders": {
+    "claude-haiku-5-5": "claude",
+    "claude-sonnet-5-5": "claude",
+    "claude-opus-5-5": "claude",
+    "claude-opus-5": "claude",
+    "claude-fable-5-1": "claude",
+    "openai/gpt-oss-120b": "groq",
+    "openai/gpt-oss-20b": "groq"
+  },
+  "models": {
+    "claude-haiku-5-5": [0.1, 0.5, 0.125, 0.2, 0.01],
+    "claude-sonnet-5-5": [2, 10, 2.5, 4, 0.1],
+    "claude-opus-5-5": [4, 20, 5, 8, 0.2],
+    "claude-opus-5": [5, 25, 6.25, 10, 0.5],
+    "claude-fable-5-1": [10, 50, 12.5, 20, 0.25],
+    "openai/gpt-oss-120b": [0.15, 0.60, 0.15, 0.15, 0.075],
+    "openai/gpt-oss-20b": [0.075, 0.30, 0.075, 0.075, 0.0375]
+  },
+  "haikuLongContextThreshold": 100000,
+  "haikuLongContextRates": [0.5, 2.5, 0.625, 1, 0.05]
+}

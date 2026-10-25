@@ -67,7 +67,7 @@ function Decision({ worker: w, canSend }: { worker: LiveWorker; canSend: boolean
           <span className="px-tag pulse-step self-start" style={{ background: "var(--amber)", color: "var(--on-accent)" }}>
             Needs a human
           </span>
-          <h2 id={`human-${id}`} className="text-[20px]">
+          <h2 id={`human-${id}`} className="text-[30px]">
             {id} is paused until you decide
           </h2>
           {last?.verdict.reasoning && <p className="m-0 text-sm text-soft">The court: {last.verdict.reasoning}</p>}

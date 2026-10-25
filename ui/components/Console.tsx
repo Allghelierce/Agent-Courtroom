@@ -34,17 +34,18 @@ export function Bar({ value, max, color, warnAt, label }: { value: number; max: 
 // Tests passing over the worker's steps, as a step line.
 export function Sparkline({ events, total, width = 96, height = 24 }: { events: Event[]; total: number; width?: number; height?: number }) {
   if (events.length < 2 || total === 0) return <svg width={width} height={height} aria-hidden />;
-  const x = (i: number) => (i / (events.length - 1)) * (width - 2) + 1;
-  const y = (v: number) => height - 1 - (v / total) * (height - 2);
+  // Whole-pixel coordinates and crisp edges, so the line matches the pixel art around it.
+  const x = (i: number) => Math.round((i / (events.length - 1)) * (width - 2)) + 1;
+  const y = (v: number) => Math.round(height - 1 - (v / total) * (height - 2));
   let d = `M ${x(0)} ${y(events[0].testsPassing)}`;
   events.forEach((e, i) => {
     if (i === 0) return;
     d += ` H ${x(i)} V ${y(e.testsPassing)}`;
   });
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden>
-      <line x1="0" x2={width} y1={y(total)} y2={y(total)} stroke="var(--c-line)" strokeDasharray="2 3" />
-      <path d={d} fill="none" stroke="var(--green)" strokeWidth="1.5" />
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} shapeRendering="crispEdges" aria-hidden>
+      <line x1="0" x2={width} y1={y(total)} y2={y(total)} stroke="var(--edge)" strokeDasharray="2 2" />
+      <path d={d} fill="none" stroke="var(--green)" strokeWidth="2" strokeLinecap="square" />
     </svg>
   );
 }

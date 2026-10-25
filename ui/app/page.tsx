@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { MONITORS, Sparkline } from "@/components/Console";
-import { CourtScene } from "@/components/CourtScene";
+import { FramedScene } from "@/components/CourtScene";
 import { Meter, PixelIcon, RulingTag, StatusTag, WarningLights } from "@/components/Pieces";
 import { NeedsHuman } from "@/components/NeedsHuman";
 import { Chibi } from "@/components/Sprites";
 import { CHARGE_PHRASE, KIND_LABEL, RULING_LABEL, STATE_LABEL, clock, describeEvent, usd, type Charge, type Ruling, type Trial } from "@/lib/data";
 import { useLive, type FeedItem, type LiveWorker } from "@/lib/live";
 import type { Mood } from "@/lib/sprites";
-import { runCosts, savings, type ComparisonResult, type WorkerResult, type WorkerState } from "@/lib/stream";
+import { DEMO_TRIALS, runCosts, savings, type ComparisonResult, type WorkerResult, type WorkerState } from "@/lib/stream";
 
 export default function Dashboard() {
   const live = useLive();
@@ -37,13 +37,12 @@ export default function Dashboard() {
         <Impact />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <ComparisonPanel comparison={live.comparison} error={live.comparisonError} />
-        <MonitorsPanel />
-      </div>
+      <ComparisonPanel comparison={live.comparison} error={live.comparisonError} />
+
+      <MonitorsPanel />
 
       <section aria-labelledby="workers-h" className="flex flex-col gap-4">
-        <h2 id="workers-h" className="text-[20px]">Workers</h2>
+        <h2 id="workers-h" className="text-[30px]">Workers</h2>
         {workers.length === 0 ? (
           <p className="px-box m-0 p-6 text-soft">Waiting for the first worker to start...</p>
         ) : (
@@ -64,9 +63,19 @@ export default function Dashboard() {
 
 // ---------- court in session ----------
 
+// The courtroom scene is a way in: clicking it opens the trial, like zooming into the court.
+function SceneLink({ href, children }: { href?: string; children: React.ReactNode }) {
+  if (!href) return <div className="self-start">{children}</div>;
+  return (
+    <Link href={href} className="block self-start hover:brightness-110" aria-label="Open the courtroom" title="Open the courtroom">
+      {children}
+    </Link>
+  );
+}
+
 function evidenceLabel(ids: number[]): string {
-  if (ids.length <= 4) return ids.map((n) => `#${n}`).join(", ");
-  return `${ids.length} events, #${Math.min(...ids)} to #${Math.max(...ids)}`;
+  if (ids.length <= 3) return ids.map((n) => `#${n}`).join(", ");
+  return `${ids.length} events`;
 }
 
 const TURNS = ["pros", "def", "judge"] as const;
@@ -81,15 +90,15 @@ function InSession({ charge, trial, others }: { charge: Charge; trial?: Trial; o
   const looping = charge.kind === "looping";
 
   return (
-    <section className="px-box grid grid-cols-[minmax(0,1fr)] gap-6 p-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:p-6" style={{ borderColor: "var(--red)" }} aria-labelledby="session-h" aria-live="polite">
-      <div className="self-start border-4 border-edge bg-[#2a1d4a]">
-        <CourtScene speaker={TURNS[turn]} moods={{ pros: "angry", def: "shout", worker: looping ? "dizzy" : "worried" }} swirl={looping} workerLabel={charge.workerId} maxScale={4} />
-      </div>
+    <section className="px-box grid grid-cols-[minmax(0,1fr)] gap-6 p-4 md:p-6 lg:grid-cols-[520px_minmax(0,1fr)]" style={{ borderColor: "var(--red)" }} aria-labelledby="session-h" aria-live="polite">
+      <SceneLink href={trial && `/court/${trial.id}`}>
+        <FramedScene speaker={TURNS[turn]} moods={{ pros: "angry", def: "shout", worker: looping ? "dizzy" : "worried" }} swirl={looping} workerLabel={charge.workerId} maxScale={2} />
+      </SceneLink>
       <div className="flex flex-col justify-center gap-4">
         <span className="px-tag pulse-step self-start" style={{ background: "var(--red)", color: "var(--on-accent)" }}>
           Court is in session
         </span>
-        <h1 id="session-h" className="text-[28px]">
+        <h1 id="session-h" className="text-[40px]">
           {charge.workerId} is charged with {CHARGE_PHRASE[charge.kind]}
         </h1>
         <p className="m-0 line-clamp-3">{charge.summary}</p>
@@ -118,13 +127,13 @@ function InSession({ charge, trial, others }: { charge: Charge; trial?: Trial; o
 
 function LatestCase({ trial }: { trial: Trial }) {
   return (
-    <section className="px-box grid grid-cols-[minmax(0,1fr)] gap-6 p-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:p-6" aria-labelledby="latest-h">
-      <div className="self-start border-4 border-edge bg-[#2a1d4a]">
-        <CourtScene speaker="judge" moods={{ worker: trial.verdict.ruling === "halt" ? "worried" : "happy", pros: "angry", def: "neutral" }} swirl={false} workerLabel={trial.workerId} maxScale={4} />
-      </div>
+    <section className="px-box grid grid-cols-[minmax(0,1fr)] gap-6 p-4 md:p-6 lg:grid-cols-[520px_minmax(0,1fr)]" aria-labelledby="latest-h">
+      <SceneLink href={`/court/${trial.id}`}>
+        <FramedScene speaker="judge" moods={{ worker: trial.verdict.ruling === "halt" ? "worried" : "happy", pros: "angry", def: "neutral" }} swirl={false} workerLabel={trial.workerId} maxScale={2} />
+      </SceneLink>
       <div className="flex flex-col justify-center gap-4">
         <span className="text-sm text-soft">Latest intervention</span>
-        <h1 id="latest-h" className="text-[28px]">
+        <h1 id="latest-h" className="text-[40px]">
           {trial.workerId} was charged with {CHARGE_PHRASE[trial.charge.kind]}
         </h1>
         <p className="m-0 line-clamp-3">{trial.charge.summary}</p>
@@ -136,7 +145,9 @@ function LatestCase({ trial }: { trial: Trial }) {
         {trial.verdict.instruction && (
           <div className="flex flex-col gap-1">
             <span className="text-sm text-soft">Sent to the worker&apos;s next prompt</span>
-            <p className="px-inset m-0 line-clamp-4 p-3 text-sm">{trial.verdict.instruction}</p>
+            <div className="px-inset p-3">
+              <p className="m-0 line-clamp-4 text-sm">{trial.verdict.instruction}</p>
+            </div>
           </div>
         )}
         <div className="flex flex-wrap gap-3">
@@ -154,17 +165,34 @@ function LatestCase({ trial }: { trial: Trial }) {
   );
 }
 
+// The courtroom is always one click away: the recorded looping trial is the clearest example of what the court does.
+const SAMPLE_TRIAL = DEMO_TRIALS.find((t) => t.verdict.ruling === "change_strategy") ?? DEMO_TRIALS[0];
+
 function QuietCourt() {
+  const live = useLive();
   return (
-    <section className="px-box grid grid-cols-[minmax(0,1fr)] gap-6 p-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:p-6" aria-labelledby="quiet-h">
-      <div className="self-start border-4 border-edge bg-[#2a1d4a]">
-        <CourtScene speaker={null} moods={{ worker: "happy", judge: "happy" }} workerLabel="a worker" maxScale={4} />
-      </div>
+    <section className="px-box grid grid-cols-[minmax(0,1fr)] gap-6 p-4 md:p-6 lg:grid-cols-[520px_minmax(0,1fr)]" aria-labelledby="quiet-h">
+      <SceneLink href={SAMPLE_TRIAL && `/court/${SAMPLE_TRIAL.id}`}>
+        <FramedScene speaker={null} moods={{ worker: "happy", judge: "happy" }} workerLabel="a worker" maxScale={2} />
+      </SceneLink>
       <div className="flex flex-col justify-center gap-4">
-        <h1 id="quiet-h" className="text-[28px]">The court is waiting</h1>
+        <h1 id="quiet-h" className="text-[40px]">The court is waiting</h1>
         <p className="m-0">
           Cheap code monitors check every step each worker takes. Court only convenes when one of them flags a worker that is looping, stuck, overspending, or flailing.
         </p>
+        <div className="flex flex-wrap gap-3">
+          {SAMPLE_TRIAL && (
+            <Link href={`/court/${SAMPLE_TRIAL.id}`} className="px-btn red">
+              <PixelIcon name="gavel" />
+              Watch a sample trial
+            </Link>
+          )}
+          {(live.source === "live" || live.source === "disconnected") && (
+            <button type="button" className="px-btn ghost" onClick={live.playDemo}>
+              Play the recorded demo
+            </button>
+          )}
+        </div>
       </div>
     </section>
   );
@@ -178,7 +206,7 @@ function RunStatus() {
     connecting: "Connecting to the engine...",
     live: "Live from the engine",
     disconnected: "Disconnected from the engine, showing the last data received",
-    replay: "Demo replay of a recorded run",
+    replay: live.demoChosen ? "Recorded demo (the engine is running)" : "Demo replay of a recorded run",
   }[live.source];
   const dot = { connecting: "var(--soft)", live: "var(--green)", disconnected: "var(--amber)", replay: "var(--blue)" }[live.source];
 
@@ -189,6 +217,11 @@ function RunStatus() {
         {label}
         {live.source === "replay" ? `, ${Math.round(live.progress * 100)}%` : ""}
       </span>
+      {(live.source === "live" || live.source === "disconnected") && (
+        <button type="button" className="px-btn sm ghost" onClick={live.playDemo}>
+          Play the recorded demo
+        </button>
+      )}
       {live.source === "replay" && (
         <div className="flex flex-wrap gap-2">
           <button type="button" className="px-btn sm ghost" onClick={() => live.setPlaying(!live.playing)}>
@@ -202,6 +235,11 @@ function RunStatus() {
           <button type="button" className="px-btn sm ghost" onClick={live.restart}>
             Restart
           </button>
+          {live.demoChosen && (
+            <button type="button" className="px-btn sm" onClick={live.goLive}>
+              Back to the live engine
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -278,7 +316,7 @@ function ComparisonPanel({ comparison, error }: { comparison?: ComparisonResult;
   if (!comparison) {
     return (
       <section className="px-box flex flex-col gap-2 p-6" aria-labelledby="cmp-h">
-        <h2 id="cmp-h" className="text-[20px]">With the court vs. without it</h2>
+        <h2 id="cmp-h" className="text-[30px]">With the court vs. without it</h2>
         <p className="m-0" style={{ color: error ? "var(--amber)" : "var(--soft)" }}>
           {error ? `The comparison run failed: ${error}` : "The same task also runs once with the court turned off. The comparison appears here when both runs finish."}
         </p>
@@ -292,7 +330,7 @@ function ComparisonPanel({ comparison, error }: { comparison?: ComparisonResult;
     <section className="px-box flex flex-col gap-5 p-6" aria-labelledby="cmp-h">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 id="cmp-h" className="text-[20px]">With the court vs. without it</h2>
+          <h2 id="cmp-h" className="text-[30px]">With the court vs. without it</h2>
           {comparison.costMode === "simulated" && <span className="px-tag" style={{ background: "var(--inset)", color: "var(--soft)" }}>Simulated costs</span>}
         </div>
         <p className="m-0 font-semibold" style={{ color: "var(--gold)" }}>
@@ -338,14 +376,16 @@ function RunRow({ label, run, scale }: { label: string; run: WorkerResult; scale
 
 function MonitorsPanel() {
   return (
-    <section className="px-box flex flex-col gap-3 p-6" aria-labelledby="mon-h">
-      <h2 id="mon-h" className="text-[20px]">Monitors</h2>
-      <p className="m-0 text-[13px] text-soft">Plain code with no model calls, run on every step. Court only convenes when one fires.</p>
-      <ul className="m-0 flex list-none flex-col gap-3 p-0">
+    <section className="flex flex-col gap-4" aria-labelledby="mon-h">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <h2 id="mon-h" className="text-[30px]">Monitors</h2>
+        <span className="text-sm text-soft">Plain code on every step, no model calls. Court convenes only when one fires.</span>
+      </div>
+      <ul className="m-0 grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
         {MONITORS.map((m) => (
-          <li key={m.kind} className="flex flex-col">
-            <span className="text-sm font-semibold">{KIND_LABEL[m.kind]}</span>
-            <span className="text-[13px] text-soft">{m.rule}</span>
+          <li key={m.kind} className="px-box flex flex-col gap-1 p-4">
+            <span className="font-display text-[20px]">{KIND_LABEL[m.kind]}</span>
+            <span className="text-[13px] leading-snug text-soft">{m.rule}</span>
           </li>
         ))}
       </ul>
@@ -389,20 +429,20 @@ function WorkerCard({ worker: w, selected, onSelect }: { worker: LiveWorker; sel
           <Chibi who="worker" mood={moodFor(w)} scale={2} />
         </span>
         <span className="flex min-w-0 flex-col gap-1">
-          <span className="font-display text-[20px] leading-none">{s.workerId}</span>
+          <span className={`font-display leading-none ${s.workerId.length > 12 ? "text-[20px]" : "text-[30px]"}`}>{s.workerId}</span>
           <span className="text-sm text-soft">Step {s.step}</span>
           <StatusTag state={s.state} />
         </span>
       </button>
 
       <div className="flex flex-col gap-1">
-        <div className="flex items-end justify-between gap-2 text-sm">
-          <span>Tests passing</span>
-          <span className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <span>Tests</span>
+          <span className="flex items-center gap-2 whitespace-nowrap">
             <span title="Tests passing over the run">
               <Sparkline events={w.events} total={s.testsTotal} width={56} height={16} />
             </span>
-            {s.testsPassing} / {s.testsTotal}
+            {s.testsPassing}/{s.testsTotal}
           </span>
         </div>
         <Meter value={s.testsPassing} max={s.testsTotal} color="var(--green)" label={`${s.workerId} tests passing`} />
@@ -411,7 +451,7 @@ function WorkerCard({ worker: w, selected, onSelect }: { worker: LiveWorker; sel
       <div className="flex flex-col gap-1">
         <div className="flex justify-between text-sm">
           <span>{s.costMode === "simulated" ? "Simulated spend" : "Spend"}</span>
-          <span>{usd(s.costUsd)} of {usd(s.budgetUsd)}</span>
+          <span className="whitespace-nowrap">{usd(s.costUsd)} of {usd(s.budgetUsd)}</span>
         </div>
         <Meter value={s.costUsd} max={s.budgetUsd} cells={20} color={s.costUsd / s.budgetUsd > 0.8 ? "var(--red)" : "var(--amber)"} label={`${s.workerId} spend`} />
       </div>
@@ -420,7 +460,7 @@ function WorkerCard({ worker: w, selected, onSelect }: { worker: LiveWorker; sel
 
       {lastRuling && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-soft">Court ruled</span>
+          <span className="text-soft">Ruling</span>
           <RulingTag ruling={lastRuling.verdict.ruling} />
         </div>
       )}
@@ -447,7 +487,7 @@ function Interventions() {
 
   return (
     <section aria-labelledby="int-h" className="flex flex-col gap-4">
-      <h2 id="int-h" className="text-[20px]">Interventions</h2>
+      <h2 id="int-h" className="text-[30px]">Interventions</h2>
       <div className="px-box overflow-x-auto">
         {rows.length === 0 ? (
           <p className="m-0 p-4 text-sm text-soft">No monitor has flagged a worker yet.</p>
@@ -467,7 +507,7 @@ function Interventions() {
             <tbody>
               {rows.map(({ charge, trial, ruled }) => (
                 <tr key={`${charge.workerId}-${charge.id}`}>
-                  <td className="whitespace-nowrap font-semibold">{charge.workerId}</td>
+                  <td className="max-w-[180px] font-semibold">{charge.workerId}</td>
                   <td>{KIND_LABEL[charge.kind]}</td>
                   <td className="whitespace-nowrap text-soft">{evidenceLabel(charge.eventIds)}</td>
                   <td>
@@ -482,7 +522,7 @@ function Interventions() {
                       </span>
                     )}
                   </td>
-                  <td className="max-w-[380px]">
+                  <td className="max-w-[300px]">
                     <span className="line-clamp-2 text-soft">{ruled ? (trial?.verdict.instruction ?? "None: the worker carries on as before.") : "Waiting for the Judge"}</span>
                   </td>
                   <td className="whitespace-nowrap">{trial && ruled ? `${usd(trial.costUsd)}${trial.mock ? " (mock)" : ""}` : ""}</td>
@@ -490,7 +530,7 @@ function Interventions() {
                     {trial && (
                       <span className="flex justify-end gap-2">
                         <Link href={`/court/${trial.id}?view=record`} className="px-btn sm ghost">Record</Link>
-                        <Link href={`/court/${trial.id}`} className="px-btn sm ghost">{trial.summary ? "Ruling" : "Courtroom"}</Link>
+                        <Link href={`/court/${trial.id}`} className="px-btn sm ghost">{trial.summary ? "Ruling" : "Watch"}</Link>
                       </span>
                     )}
                   </td>
@@ -520,7 +560,7 @@ function ActivityFeed({ only, onClear }: { only: string | null; onClear: () => v
   return (
     <section aria-labelledby="feed-h" className="flex flex-col gap-4">
       <div className="flex items-center gap-4">
-        <h2 id="feed-h" className="text-[20px]">Activity{only ? ` for ${only}` : ""}</h2>
+        <h2 id="feed-h" className="text-[30px]">Activity{only ? ` for ${only}` : ""}</h2>
         {only && (
           <button type="button" className="px-btn sm ghost" onClick={onClear}>
             Show all workers
@@ -532,10 +572,10 @@ function ActivityFeed({ only, onClear }: { only: string | null; onClear: () => v
         {rows.map((r, i) => {
           const trial = r.charge ? live.trialFor(r.charge.workerId, r.charge.id) : undefined;
           return (
-            <li key={r.seq} className="grid grid-cols-[12px_92px_80px_1fr] items-baseline gap-3 px-4 py-2 text-sm" style={{ background: i % 2 ? "var(--inset)" : undefined }}>
+            <li key={r.seq} className="grid grid-cols-[12px_92px_120px_1fr] items-baseline gap-3 px-4 py-2 text-sm" style={{ background: i % 2 ? "var(--inset)" : undefined }}>
               <span aria-hidden className="inline-block size-2.5" style={{ background: TONE_COLOR[r.tone] }} />
               <span className="text-soft">{clock(r.at)}</span>
-              <span>{r.workerId}</span>
+              <span className="truncate" title={r.workerId}>{r.workerId}</span>
               {trial ? (
                 <Link href={`/court/${trial.id}`} className="min-w-0 font-semibold underline decoration-2 underline-offset-4">
                   {r.text}

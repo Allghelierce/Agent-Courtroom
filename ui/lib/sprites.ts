@@ -271,7 +271,7 @@ export const STAGE: Record<Exclude<CastKey, "clerk">, { x: number; y: number }> 
   judge: { x: 117, y: 20 },
   pros: { x: 30, y: 56 },
   def: { x: 204, y: 56 },
-  worker: { x: 117, y: 56 },
+  worker: { x: 117, y: 66 }, // in front of the lawyers' row: back (judge), middle (lawyers), front (worker)
 };
 
 export function sceneBack(): Pix {
@@ -313,6 +313,11 @@ export function sceneBack(): Pix {
   // carpet up the middle
   p.rect(104, FLOOR_Y + 1, 48, SCENE_H - FLOOR_Y, "#7a2348");
   p.rect(104, FLOOR_Y + 1, 2, SCENE_H - FLOOR_Y, GOLD); p.rect(150, FLOOR_Y + 1, 2, SCENE_H - FLOOR_Y, GOLD);
+  // contact shadows just below each piece's outline: the judge's bench, both desks, the witness stand
+  const SHADOW = "#2e1a2a";
+  p.rect(85, 85, 86, 2, SHADOW);
+  p.rect(11, 109, 60, 2, SHADOW); p.rect(185, 109, 60, 2, SHADOW);
+  p.rect(107, 115, 42, 2, SHADOW);
   return p;
 }
 
@@ -320,10 +325,11 @@ export function sceneBack(): Pix {
 export function sceneBench(): Pix {
   const p = new Pix(SCENE_W, SCENE_H);
   p.rect(84, 46, 88, 4, "#c98a4a");
-  p.rect(86, 50, 84, 28, "#6e3f22");
+  p.rect(86, 50, 84, 30, "#6e3f22");
+  p.rect(84, 80, 88, 4, "#4a2a18"); // base, standing on the floor line
   for (const bx of [90, 118, 146]) { p.rect(bx, 54, 20, 20, "#8f5530"); p.rect(bx, 54, 20, 1, "#b06e3e"); }
   p.rect(116, 47, 24, 3, GOLD);
-  p.rect(124, 58, 8, 8, GOLD); p.rect(126, 60, 4, 4, "#a5781e");
+  p.rect(116, 53, 24, 5, GOLD); p.rect(118, 55, 20, 1, "#a5781e"); // nameplate, clear of the worker standing in front
   return p.outline();
 }
 
@@ -342,11 +348,11 @@ export function sceneFront(): Pix {
   // name plates
   p.rect(30, 94, 22, 6, "#ff5d73"); p.rect(204, 94, 22, 6, "#5cc8ff");
   // witness stand
-  p.rect(106, 82, 44, 4, "#c98a4a");
-  p.rect(108, 86, 40, 18, "#6e3f22");
-  p.rect(112, 90, 32, 10, "#8f5530");
-  p.rect(117, 92, 22, 6, "#150f28");
-  p.rect(119, 94, 18, 2, "#7af0c4");
+  p.rect(106, 92, 44, 4, "#c98a4a");
+  p.rect(108, 96, 40, 18, "#6e3f22");
+  p.rect(112, 100, 32, 10, "#8f5530");
+  p.rect(117, 102, 22, 6, "#150f28");
+  p.rect(119, 104, 18, 2, "#7af0c4");
   return p.outline();
 }
 

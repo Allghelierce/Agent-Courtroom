@@ -151,6 +151,9 @@ type LiveValue = RunState & {
   setPlaying: (p: boolean) => void;
   setSpeed: (s: number) => void;
   restart: () => void;
+  demoChosen: boolean; // the viewer switched to the recorded demo while the engine may be up
+  playDemo: () => void; // show the recorded run even though the engine is up
+  goLive: () => void; // back to the engine's stream
   trialFor: (workerId: string, chargeId: number) => Trial | undefined;
   runTrials: Trial[]; // trials for the verdicts seen in this run, oldest first
   caseLog: Trial[]; // every trial to list in the case log, oldest first
@@ -164,10 +167,13 @@ export function LiveProvider({ children }: { children: ReactNode }) {
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(2);
   const [index, setIndex] = useState(0);
+  const [demoChosen, setDemoChosen] = useState(false);
   const courtCases = useCourtCases();
 
-  // Try the engine's stream first; fall back to the bundled replay if it isn't up.
+  // Try the engine's stream first; fall back to the bundled replay if it isn't up. A viewer who picks the recorded
+  // demo skips the engine entirely until they go back to it.
   useEffect(() => {
+    if (demoChosen) return;
     const es = new EventSource(`${ENGINE_URL}/stream`);
     let opened = false;
     const timer = setTimeout(() => {
@@ -201,7 +207,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       clearTimeout(timer);
       es.close();
     };
-  }, []);
+  }, [demoChosen]);
 
   // The in-browser replay, paced like the original run.
   useEffect(() => {
@@ -217,6 +223,20 @@ export function LiveProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "reset" });
     setIndex(0);
     setPlaying(true);
+  }, []);
+
+  const playDemo = useCallback(() => {
+    dispatch({ type: "reset" });
+    setIndex(0);
+    setPlaying(true);
+    setDemoChosen(true);
+    setSource("replay");
+  }, []);
+
+  const goLive = useCallback(() => {
+    dispatch({ type: "reset" });
+    setSource("connecting");
+    setDemoChosen(false);
   }, []);
 
   const value = useMemo<LiveValue>(() => {
@@ -240,11 +260,14 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       setPlaying,
       setSpeed,
       restart,
+      demoChosen,
+      playDemo,
+      goLive,
       trialFor,
       runTrials: state.verdicts.flatMap((v) => trialFor(v.workerId, v.chargeId) ?? []),
       caseLog: known.size > 0 ? [...known.values()].toSorted((a, b) => a.startedAt.localeCompare(b.startedAt)) : DEMO_TRIALS,
     };
-  }, [state, source, courtCases, playing, speed, index, restart]);
+  }, [state, source, courtCases, playing, speed, index, restart, demoChosen, playDemo, goLive]);
 
   return <LiveContext.Provider value={value}>{children}</LiveContext.Provider>;
 }

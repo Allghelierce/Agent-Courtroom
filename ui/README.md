@@ -1,4 +1,4 @@
-# Agent Courtroom UI
+# Docket UI
 
 The dashboard, courtroom and case log. Next.js. Read `ART.md` before changing anything visual.
 

@@ -46,7 +46,7 @@ export function WarningLights({ lit }: { lit: ChargeKind[] }) {
           <li key={kind} className="flex items-center gap-2 text-sm" style={{ color: on ? "var(--text)" : "var(--soft)" }}>
             <span
               aria-hidden
-              className="inline-block size-3 border-2 border-edge"
+              className="inline-block size-3 shrink-0 border-2 border-edge"
               style={on ? { background: color, boxShadow: `0 0 0 4px color-mix(in srgb, ${color} 40%, transparent)` } : undefined}
             />
             {KIND_LABEL[kind]}

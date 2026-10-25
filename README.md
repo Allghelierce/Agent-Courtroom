@@ -94,11 +94,3 @@ The smoke test starts temporary local services, runs three workers at once, chec
 
 - Everyone works on their own branch (`Tristan`, `Amelia`, ...). Commit and push often.
 - Never commit directly to `main`. Merge through a PR.
-
-## Judging
-
-The top 5 projects will be picked to demo. Projects are judged in 3 areas:
-
-- **Scalability:** cheap code checks, plus a court only when needed, so one court can oversee many workers.
-- **Innovation:** an adversarial trial instead of a single "are you stuck?" check.
-- **Real-world impact:** runaway agents waste real money. We show cost with vs. without the court.

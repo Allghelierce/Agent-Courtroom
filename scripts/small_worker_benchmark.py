@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import time
+import httpx
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -48,8 +49,17 @@ class OpenRouterBrain(GroqBrain):
             "provider": {"only": ["groq"], "allow_fallbacks": False, "require_parameters": True},
         }, cast_to=ChatCompletion)
         if not response.choices:
+            error = getattr(response, "error", None)
+            message = error.get("message", "") if isinstance(error, dict) else ""
+            if "tool call validation failed" in message.lower():
+                # OpenRouter may wrap a model's malformed arguments in a 200
+                # error envelope. Preserve the same observed-failure behavior
+                # as direct Groq, rather than treating this as a worker crash.
+                raise BadRequestError(message, response=httpx.Response(400,
+                    request=httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")),
+                    body={"error": {"code": "tool_use_failed", "message": message}})
             raise RuntimeError("OpenRouter returned no completion choices: " +
-                               json.dumps(getattr(response, "error", None))[:500])
+                               json.dumps(error)[:500])
         return response
 
     def _response_cost(self, response):

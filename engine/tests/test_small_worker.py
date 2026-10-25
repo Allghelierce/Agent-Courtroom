@@ -15,6 +15,19 @@ from courtroom_engine.engine import get_task
 
 
 class SmallWorkerTests(unittest.TestCase):
+    def test_wrapped_tool_validation_error_is_retryable_but_transport_error_is_not(self):
+        brain = OpenRouterBrain.__new__(OpenRouterBrain)
+        brain.model, brain.tools = WORKER_MODEL, []
+        response = SimpleNamespace(choices=None, error={"code": 502,
+            "message": "Upstream error: tool call validation failed: old_str must be a string"})
+        brain.client = SimpleNamespace(post=lambda *a, **kw: response)
+        with self.assertRaises(BadRequestError) as caught:
+            brain._create_completion([])
+        self.assertEqual(caught.exception.body["error"]["code"], "tool_use_failed")
+        response.error["message"] = "Upstream service unavailable"
+        with self.assertRaises(RuntimeError):
+            brain._create_completion([])
+
     def test_advisor_format_retries_are_bounded_and_usage_stays_unknown(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

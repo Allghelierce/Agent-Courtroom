@@ -97,14 +97,14 @@ class ClaudeBrain:
 class GroqBrain:
     """The same agent on Groq's chat completions API (OpenAI-style tool calls)."""
 
-    def __init__(self, task: Task, model: str = "openai/gpt-oss-120b"):
+    def __init__(self, task: Task, model: str = "openai/gpt-oss-120b", *, client=None, rates=None):
         import groq
 
         self.groq = groq
-        self.client = groq.Groq(max_retries=5, timeout=90.0)  # preserve A's free-tier retry behavior
+        self.client = client if client is not None else groq.Groq(max_retries=5, timeout=90.0)
         self.task = task
         self.model = model
-        rates = model_rates(model)
+        rates = rates if rates is not None else model_rates(model)
         if rates is None:
             raise ValueError(f"No price for model {model}; update shared/model-prices.json")
         self.price_in, self.price_out, self.price_cached = rates[0], rates[1], rates[4]
@@ -160,16 +160,25 @@ class GroqBrain:
                       usage={"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "estimated": True},
                       cost_complete=False)
 
-    def next_action(self) -> Action:
-        request = self._request_messages()
-        try:
-            response = self.client.chat.completions.create(
+    def _create_completion(self, request):
+        return self.client.chat.completions.create(
                 model=self.model,
                 messages=request,
                 tools=self.tools,
                 tool_choice="auto",
                 max_completion_tokens=4096,  # may count against the per-minute token limit
             )
+
+    def _response_cost(self, response):
+        usage = response.usage
+        details = getattr(usage, "prompt_tokens_details", None)
+        return (self._cost(usage.prompt_tokens, usage.completion_tokens,
+                           getattr(details, "cached_tokens", None) or 0), response.model == self.model)
+
+    def next_action(self) -> Action:
+        request = self._request_messages()
+        try:
+            response = self._create_completion(request)
         except self.groq.BadRequestError as e:
             # Groq rejects tool calls the model wrote as invalid JSON. Log it as a failed step so
             # the flailing monitor can see a model that keeps doing it.
@@ -186,11 +195,10 @@ class GroqBrain:
             raise
 
         usage = response.usage
-        details = getattr(usage, "prompt_tokens_details", None)
-        cost = self._cost(usage.prompt_tokens, usage.completion_tokens, getattr(details, "cached_tokens", None) or 0)
+        cost, complete = self._response_cost(response)
         usage_record = usage.model_dump()
         usage_record["finish_reason"] = getattr(response.choices[0], "finish_reason", None)
-        accounting = {"usage": usage_record, "model": response.model, "cost_complete": response.model == self.model}
+        accounting = {"usage": usage_record, "model": response.model, "cost_complete": complete}
         message = response.choices[0].message
         calls = message.tool_calls or []
         self.messages.append({

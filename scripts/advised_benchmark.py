@@ -30,7 +30,7 @@ class ProgressBus(Bus):
         result = super().publish(type_, data)
         if type_ == "event" and data["step"] % 10 == 0:
             print("MILESTONE " + json.dumps({k: data.get(k) for k in
-                  ("step", "testsPassing", "testsTotal", "tool", "result")}), flush=True)
+                  ("workerId", "step", "testsPassing", "testsTotal", "tool", "result")}), flush=True)
         return result
 
 

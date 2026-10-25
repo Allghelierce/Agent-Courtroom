@@ -23,6 +23,24 @@ class CheckoutVerificationTests(unittest.TestCase):
         self.assertEqual(report["status"], "passed", report)
         self.assertEqual(report["passing"], 22)
 
+    def test_harder_seed_requires_payment_fixes_and_has_valid_reference(self):
+        seed = TASK.seed.parent / "checkout_hard"
+        env = VerifiedCodingEnv(seed)
+        self.addCleanup(env.cleanup)
+        for path, old, new in FIXES:
+            env.edit_file(path, old, new)
+        env.edit_file("recovery.json", "", json.dumps(DECLARATION))
+        report = evaluate(env.root, seed)
+        failed = {c["name"] for c in report["checks"] if not c["passed"]}
+        self.assertIn("gateway_success_exact_request_and_receipt", failed)
+        self.assertIn("no_receipt_on_decline", failed)
+        self.assertIn("no_receipt_on_missing_transaction", failed)
+        for name in ("checkout.py", "payments.py"):
+            (env.root / name).write_bytes((TASK.seed / name).read_bytes())
+        report = evaluate(env.root, seed)
+        self.assertEqual(report["status"], "passed", report)
+        self.assertEqual(report["passing"], 22)
+
     def test_known_bad_payment_mutants_are_rejected(self):
         source = (self.env.root / "payments.py").read_text()
         mutants = {

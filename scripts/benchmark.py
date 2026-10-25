@@ -40,12 +40,16 @@ def main():
     parser.add_argument("--budget", type=float, default=2.0)
     parser.add_argument("--max-steps", type=int, default=30)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--seed-repo", type=Path, help="Alternate checkout-v2 seed; frozen identically for both arms")
     parser.add_argument("--success-criteria", help="Human-approved evaluation definition, recorded verbatim")
     parser.add_argument("--decisions", type=Path, help="Decision record to freeze with the benchmark; provides success criteria")
     parser.add_argument("--env-file", type=Path, help="Load API keys from a local ignored dotenv file")
     parser.add_argument("--start-court", action="store_true", help="Start a separate court on a temporary port; same provider as the worker")
     parser.add_argument("--stripe-sandbox", action="store_true", help="Verify recovered checkout-v2 snapshots through the Stripe sandbox adapter")
     args = parser.parse_args()
+    if args.seed_repo and (args.tasks != ["checkout-v2"] or not args.seed_repo.is_dir()
+                           or not (args.seed_repo / "tests").is_dir()):
+        parser.error("--seed-repo requires --tasks checkout-v2 and a seed directory containing tests/")
     if args.stripe_sandbox and args.tasks != ["checkout-v2"]:
         parser.error("--stripe-sandbox requires --tasks checkout-v2")
     if args.env_file:
@@ -82,7 +86,7 @@ def main():
     for task, cfg in configs.items():
         definition = get_task(task)
         seed = out / "seeds" / task
-        shutil.copytree(definition.seed, seed, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        shutil.copytree(args.seed_repo or definition.seed, seed, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         cfg.seed, cfg.evidence_dir = seed, out / "evidence"
         (seed.parent / f"{task}-prompt.json").write_text(json.dumps({
             "prompt": definition.prompt, "systemPrompt": definition.system_prompt, "tools": definition.tools,
@@ -111,6 +115,7 @@ def main():
         (out / "manifest.json").write_text(json.dumps({
             "revision": revision, "dirtyWorkingTree": dirty, "brain": args.brain,
             "repetitions": args.repetitions, "maxSteps": args.max_steps, "workerBudgetUsd": args.budget,
+            "seedSource": str(args.seed_repo) if args.seed_repo else "task default",
             "humanEscalation": "stop immediately; no human intervention during comparison",
             "armOrder": "alternating: court first on odd pairs", "successCriteria": args.success_criteria,
             "limitation": "Worker budget checked between calls; court costs separate. One pair is exploratory, not a statistical result.",

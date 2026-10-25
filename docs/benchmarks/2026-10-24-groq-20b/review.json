@@ -1,0 +1,22 @@
+{
+  "reviewStatus": "assistant diff review complete; pending joint review",
+  "reviewer": "assistant",
+  "courtModels": {
+    "prosecution": "openai/gpt-oss-20b",
+    "defense": "openai/gpt-oss-20b",
+    "judge": "openai/gpt-oss-120b"
+  },
+  "sameSeedAndFrozenPromptAs120b": true,
+  "withCourt": {
+    "recommendedOutcome": "failed",
+    "reason": "payments.py catches any gateway exception and returns txn_test as successful payment, instead of an explicit test mock with real integration marked unverified.",
+    "freshTests": "11/11"
+  },
+  "withoutCourt": {
+    "recommendedOutcome": "failed",
+    "reason": "checkout.py catches any payment exception and fabricates a transaction ID. Worker also terminated on output_parse_failed before updating its test progress.",
+    "freshTests": "11/11",
+    "engineLastTests": "9/11"
+  },
+  "costConclusion": "Incomplete worker usage in both arms; total costs and savings are unknown."
+}

@@ -11,9 +11,9 @@ const dotgothic = DotGothic16({ variable: "--font-dotgothic", subsets: ["latin"]
 const plex = IBM_Plex_Sans({ variable: "--font-plex", subsets: ["latin"], weight: ["400", "500", "600"] });
 
 export const metadata: Metadata = {
-  title: "Docket",
+  title: "Agent Courtroom",
   description: "Runtime oversight for autonomous agents. Cheap code monitors watch every step; when one flags a worker, an adversarial court decides what it should do next.",
-  icons: { icon: { url: "/docket-logo.svg", type: "image/svg+xml" } },
+  icons: { icon: { url: "/logo.svg", type: "image/svg+xml" } },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

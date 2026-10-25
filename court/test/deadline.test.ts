@@ -27,7 +27,7 @@ function hang(seen: AbortSignal[]) {
   };
 }
 
-// Fails instead of hanging if the deadline never fires. The 50s default would trip it too,
+// Fails instead of hanging if the deadline never fires. The 120s default would trip it too,
 // so passing also shows COURT_DEADLINE_MS took effect.
 async function within<T>(ms: number, p: Promise<T>): Promise<T> {
   let timer: NodeJS.Timeout | undefined;

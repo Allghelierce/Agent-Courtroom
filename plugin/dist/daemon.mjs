@@ -50643,31 +50643,31 @@ function testsResult(run, output2) {
 }
 function mapToolCall(h) {
   const input2 = h.tool_input ?? {};
-  const failed = h.error !== void 0 || h.is_interrupt === true;
-  const output2 = failed ? `${h.error ?? ""}
+  const failed2 = h.error !== void 0 || h.is_interrupt === true;
+  const output2 = failed2 ? `${h.error ?? ""}
 ${text(h.tool_response)}` : text(h.tool_response);
   const errorText2 = h.is_interrupt ? "interrupted by the user" : clip3(normalize(h.error ?? ""), 240);
   switch (h.tool_name) {
     case "Read":
-      return withError(failed, errorText2, {
+      return withError(failed2, errorText2, {
         tool: "read_file",
         args: { path: rel(input2.file_path, h.cwd), ...input2.offset != null ? { offset: input2.offset } : {}, ...input2.limit != null ? { limit: input2.limit } : {} },
         result: `read ${readLines(h.tool_response)} lines`
       });
     case "Edit":
-      return withError(failed, errorText2, {
+      return withError(failed2, errorText2, {
         tool: "edit_file",
         args: { path: rel(input2.file_path, h.cwd), old_str: clip3(String(input2.old_string ?? ""), 300), new_str: clip3(String(input2.new_string ?? ""), 300) },
         result: `edited ${rel(input2.file_path, h.cwd)}`
       });
     case "MultiEdit":
-      return withError(failed, errorText2, {
+      return withError(failed2, errorText2, {
         tool: "edit_file",
         args: { path: rel(input2.file_path, h.cwd), edits: Array.isArray(input2.edits) ? input2.edits.length : 0 },
         result: `edited ${rel(input2.file_path, h.cwd)}`
       });
     case "Write":
-      return withError(failed, errorText2, {
+      return withError(failed2, errorText2, {
         tool: "edit_file",
         args: { path: rel(input2.file_path, h.cwd), chars: String(input2.content ?? "").length },
         result: `wrote ${rel(input2.file_path, h.cwd)}`
@@ -50676,29 +50676,29 @@ ${text(h.tool_response)}` : text(h.tool_response);
       const command = clip3(String(input2.command ?? ""), 300);
       const run = parseTestRun(output2);
       if (run) return { tool: "run_tests", args: { command }, result: testsResult(run, output2), tests: run };
-      if (failed) return { tool: "bash", args: { command }, result: errorText2, error: errorText2 };
+      if (failed2) return { tool: "bash", args: { command }, result: errorText2, error: errorText2 };
       return { tool: "bash", args: { command }, result: clip3(normalize(lastLine(output2)) || "ok, no output", 200) };
     }
     case "Grep":
     case "Glob": {
       const r = h.tool_response ?? {};
       const n = r.numFiles ?? r.numMatches ?? r.numLines ?? (Array.isArray(r.filenames) ? r.filenames.length : void 0);
-      return withError(failed, errorText2, {
+      return withError(failed2, errorText2, {
         tool: h.tool_name.toLowerCase(),
         args: compactArgs(input2),
         result: n != null ? `${n} ${h.tool_name === "Glob" ? "files" : "matches"}` : clip3(normalize(text(h.tool_response)), 200)
       });
     }
     default:
-      return withError(failed, errorText2, {
+      return withError(failed2, errorText2, {
         tool: h.tool_name.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase(),
         args: compactArgs(input2),
         result: clip3(normalize(text(h.tool_response)), 200) || "ok"
       });
   }
 }
-function withError(failed, errorText2, m) {
-  return failed ? { ...m, result: errorText2, error: errorText2 } : m;
+function withError(failed2, errorText2, m) {
+  return failed2 ? { ...m, result: errorText2, error: errorText2 } : m;
 }
 function readLines(resp) {
   const r = resp ?? {};
@@ -50718,8 +50718,12 @@ var DEFAULT_CONFIG = {
   costPerTestMinSteps: 6,
   errorStreak: 3,
   sameErrorRepeats: 3,
-  progressRequired: false
+  progressRequired: false,
+  stallRetries: 0,
+  loopFailuresOnly: false,
+  looseCommands: false
 };
+var SESSION_CONFIG = { ...DEFAULT_CONFIG, progressRequired: true, stallRetries: 2, loopFailuresOnly: true, looseCommands: true };
 function pyDumps(v) {
   if (v === null || v === void 0) return "null";
   if (typeof v === "boolean") return v ? "true" : "false";
@@ -50733,9 +50737,14 @@ function pyFloat(n) {
   const s = String(n);
   return /[.e]/.test(s) ? s : `${s}.0`;
 }
-function actionKey(e) {
-  return pyDumps([e.tool, e.args, e.result ?? null, e.error || null]);
+function actionKey(e, cfg) {
+  const args = cfg.looseCommands && typeof e.args.command === "string" ? { ...e.args, command: looseCommand(e.args.command) } : e.args;
+  return pyDumps([e.tool, args, e.result ?? null, e.error || null]);
 }
+function looseCommand(cmd) {
+  return cmd.replace(/^\s*(?:cd\s+(?:"[^"]*"|'[^']*'|\S+)\s*&&\s*)+/, "").replace(/\s+2>&1\b/g, "").replace(/(?:\s*\|\s*(?:tail|head)\b[^|]*)+$/, "").replace(/\s+(?:-v+|--verbose|-q|--quiet)(?=\s|$)/g, "").replace(/\s+/g, " ").trim();
+}
+var failed = (e) => Boolean(e.error) || e.tool === "run_tests" && e.testsPassing < e.testsTotal;
 function mostCommon(items) {
   const counts = /* @__PURE__ */ new Map();
   for (const x of items) counts.set(x, (counts.get(x) ?? 0) + 1);
@@ -50747,9 +50756,11 @@ var usd = (n) => `$${n.toFixed(2)}`;
 var hasProgress = (events) => events.some((e) => e.testsTotal > 0);
 function looping(events, cfg) {
   const window2 = events.slice(-cfg.loopWindow);
-  const top = mostCommon(window2.map(actionKey));
+  const counted = cfg.loopFailuresOnly ? window2.filter(failed) : window2;
+  const key = (e) => actionKey(e, cfg);
+  const top = mostCommon(counted.map(key));
   if (!top || top[1] < cfg.loopRepeats) return null;
-  const repeats = window2.filter((e) => actionKey(e) === top[0]);
+  const repeats = counted.filter((e) => key(e) === top[0]);
   const first = repeats[0];
   return {
     kind: "looping",
@@ -50761,14 +50772,19 @@ function stalling(events, cfg) {
   if (events.length < cfg.stallSteps) return null;
   const recent = events.slice(-cfg.stallSteps);
   if (cfg.progressRequired && !hasProgress(recent)) return null;
-  const before = events.length > cfg.stallSteps ? events[events.length - cfg.stallSteps - 1].testsPassing : recent[0].testsPassing;
-  if (Math.max(...recent.map((e) => e.testsPassing)) > before) return null;
+  const prior = events.length > cfg.stallSteps ? events[events.length - cfg.stallSteps - 1] : recent[0];
+  if (cfg.stallRetries && !retryingOneSuite(prior, recent, cfg.stallRetries)) return null;
+  if (Math.max(...recent.map((e) => e.testsPassing)) > prior.testsPassing) return null;
   const last = recent[recent.length - 1];
   return {
     kind: "stalling",
     summary: `Passing tests stuck at ${last.testsPassing}/${last.testsTotal} for ${cfg.stallSteps} steps`,
     eventIds: recent.map((e) => e.id)
   };
+}
+function retryingOneSuite(prior, recent, runs) {
+  const last = recent[recent.length - 1];
+  return last.testsPassing < last.testsTotal && recent.filter((e) => e.tool === "run_tests").length >= runs && [prior, ...recent].every((e) => e.testsTotal === last.testsTotal);
 }
 function overspending(events, cfg, budgetUsd) {
   const spent = events.reduce((s, e) => s + e.costUsd, 0);
@@ -50815,7 +50831,6 @@ function check2(events, budgetUsd, cfg = DEFAULT_CONFIG, enabled = ALL_MONITORS)
 
 // src/daemon.ts
 var PACKET_EVENTS = 20;
-var COURT_CFG = { ...DEFAULT_CONFIG, progressRequired: true };
 var now = () => (/* @__PURE__ */ new Date()).toISOString();
 var clip4 = (s, n) => s.length > n ? `${s.slice(0, n)}\u2026` : s;
 var KIND = { looping: "looping", stalling: "stalling", overspending: "overspending", flailing: "flailing" };
@@ -50873,11 +50888,13 @@ data: ${JSON.stringify(msg)}
       }
     }
   }
+  const folderOf = (input2) => basename(input2.cwd ?? "session") || "session";
+  const workerIdOf = (input2) => `claude-code:${folderOf(input2)}:${input2.session_id.slice(0, 6)}`;
   function workerFor(input2) {
     let w = workers.get(input2.session_id);
     if (w) return w;
-    const folder = basename(input2.cwd ?? "session") || "session";
-    const workerId = `claude-code:${folder}:${input2.session_id.slice(0, 6)}`;
+    const folder = folderOf(input2);
+    const workerId = workerIdOf(input2);
     const prior = history.filter((m) => m.data.workerId === workerId);
     const lastStatus = [...prior].reverse().find((m) => m.type === "worker")?.data;
     const events = prior.filter((m) => m.type === "event").map((m) => m.data);
@@ -51001,7 +51018,7 @@ data: ${JSON.stringify(msg)}
       publish("event", event);
       publishStatus(w);
       if (s.state !== "running" || !s.courtEnabled) return void 0;
-      const finding = check2(w.events.slice(w.windowStart), s.budgetUsd, COURT_CFG);
+      const finding = check2(w.events.slice(w.windowStart), s.budgetUsd, SESSION_CONFIG);
       if (!finding) return void 0;
       return trial(w, { id: nextChargeId++, workerId: s.workerId, ...finding }, eventName);
     });
@@ -51074,8 +51091,9 @@ Stop now. Don't call more tools; explain the situation to the user and ask how t
     }
   }
   function sessionEnd(input2) {
-    const w = workers.get(input2.session_id);
-    if (!w) return void 0;
+    const known = workers.has(input2.session_id) || history.some((m) => m.type === "worker" && m.data.workerId === workerIdOf(input2));
+    if (!known) return void 0;
+    const w = workerFor(input2);
     const s = w.status;
     if (s.state !== "halted") {
       const tested = s.testsTotal > 0;
@@ -51147,6 +51165,7 @@ Stop now. Don't call more tools; explain the situation to the user and ask how t
   }
   function stream2(req, res) {
     res.writeHead(200, { ...cors.get(res), "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
+    res.flushHeaders();
     const after = Number(req.headers["last-event-id"] ?? 0) || 0;
     for (const msg of history) if ((msg.sequence ?? 0) > after) res.write(`id: ${msg.sequence}
 data: ${JSON.stringify(msg)}

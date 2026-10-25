@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { buildPacket, holdTrial, listTrials, saveTrial, type Charge, type Event, type Trial, type Verdict } from "../../court/src/index.ts";
 import { TranscriptMeter, type PriceList } from "./cost.ts";
 import { mapToolCall, type HookToolInput } from "./map.ts";
-import { check, DEFAULT_CONFIG } from "./monitors.ts";
+import { check, SESSION_CONFIG } from "./monitors.ts";
 
 type WorkerState = "running" | "on_trial" | "awaiting_human" | "succeeded" | "halted" | "failed";
 type WorkerStatus = {
@@ -69,7 +69,6 @@ export type DaemonOptions = {
 };
 
 const PACKET_EVENTS = 20; // as engine/courtroom_engine/court.py
-const COURT_CFG = { ...DEFAULT_CONFIG, progressRequired: true };
 
 const now = () => new Date().toISOString();
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
@@ -135,11 +134,14 @@ export function createDaemon(opts: DaemonOptions = {}) {
     }
   }
 
+  const folderOf = (input: HookInput) => basename(input.cwd ?? "session") || "session";
+  const workerIdOf = (input: HookInput) => `claude-code:${folderOf(input)}:${input.session_id.slice(0, 6)}`;
+
   function workerFor(input: HookInput): Worker {
     let w = workers.get(input.session_id);
     if (w) return w;
-    const folder = basename(input.cwd ?? "session") || "session";
-    const workerId = `claude-code:${folder}:${input.session_id.slice(0, 6)}`;
+    const folder = folderOf(input);
+    const workerId = workerIdOf(input);
     // A session seen before this daemon started: rebuild its events from the stream log.
     const prior = history.filter((m) => (m.data as { workerId?: string }).workerId === workerId);
     const lastStatus = [...prior].reverse().find((m) => m.type === "worker")?.data as WorkerStatus | undefined;
@@ -276,7 +278,7 @@ export function createDaemon(opts: DaemonOptions = {}) {
       publishStatus(w);
       if (s.state !== "running" || !s.courtEnabled) return undefined;
 
-      const finding = check(w.events.slice(w.windowStart), s.budgetUsd, COURT_CFG);
+      const finding = check(w.events.slice(w.windowStart), s.budgetUsd, SESSION_CONFIG);
       if (!finding) return undefined;
       return trial(w, { id: nextChargeId++, workerId: s.workerId, ...finding }, eventName);
     });
@@ -348,8 +350,10 @@ export function createDaemon(opts: DaemonOptions = {}) {
   }
 
   function sessionEnd(input: HookInput) {
-    const w = workers.get(input.session_id);
-    if (!w) return undefined;
+    // The daemon may have restarted mid-session: close out a session it only knows from the stream log too.
+    const known = workers.has(input.session_id) || history.some((m) => m.type === "worker" && (m.data as WorkerStatus).workerId === workerIdOf(input));
+    if (!known) return undefined;
+    const w = workerFor(input);
     const s = w.status;
     if (s.state !== "halted") {
       const tested = s.testsTotal > 0;
@@ -432,6 +436,7 @@ export function createDaemon(opts: DaemonOptions = {}) {
 
   function stream(req: IncomingMessage, res: ServerResponse) {
     res.writeHead(200, { ...cors.get(res), "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
+    res.flushHeaders(); // open now, even with nothing to replay, so the dashboard sees the daemon is up
     const after = Number(req.headers["last-event-id"] ?? 0) || 0;
     for (const msg of history) if ((msg.sequence ?? 0) > after) res.write(`id: ${msg.sequence}\ndata: ${JSON.stringify(msg)}\n\n`);
     subscribers.add(res);

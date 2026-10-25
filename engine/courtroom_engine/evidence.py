@@ -18,7 +18,7 @@ def source_files(root: Path) -> dict[str, bytes]:
 def capture(env, seed: Path, destination: Path, task_name: str) -> dict:
     destination.mkdir(parents=True, exist_ok=False)
     report = {"task": task_name, "outcomeVerified": False, "reviewStatus": "pending human diff review"}
-    if task_name == "coding":
+    if task_name in ("coding", "checkout-v2"):
         before, after = source_files(seed), source_files(env.root)
         saved = destination / "source"
         saved.mkdir()
@@ -37,6 +37,15 @@ def capture(env, seed: Path, destination: Path, task_name: str) -> dict:
                 fromfile=f"seed/{name}", tofile=f"result/{name}"))
         (destination / "changes.diff").write_text("".join(patches))
         report.update(changedFiles=changed, sourceSha256={name: hashlib.sha256(data).hexdigest() for name, data in after.items()})
+        if task_name == "checkout-v2":
+            from .verification.checkout import describe, evaluate
+            checks = evaluate(saved, seed)
+            report.update(recoveryChecks=checks, stripeChecks={"status": "not_run"},
+                          testExitCode=0 if checks["status"] == "passed" else 1, testTimedOut=False,
+                          reviewStatus="independent checks complete; human diff review pending")
+            (destination / "tests.txt").write_text(describe(checks) + "\n")
+            (destination / "verification.json").write_text(json.dumps(report, indent=2) + "\n")
+            return report
         # Run the retained result afresh, outside the worker's progress counters. A passing
         # modified suite still needs human review for removed/weakened assertions.
         command = [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"]

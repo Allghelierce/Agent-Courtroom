@@ -10,5 +10,5 @@
     "typeRoots": ["../court/node_modules/@types"],
     "types": ["node"]
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "scripts"]
 }

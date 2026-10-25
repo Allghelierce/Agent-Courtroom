@@ -172,7 +172,10 @@ class GroqBrain:
         except self.groq.BadRequestError as e:
             # Groq rejects tool calls the model wrote as invalid JSON. Log it as a failed step so
             # the flailing monitor can see a model that keeps doing it.
-            if "tool_use_failed" not in str(e):
+            body = getattr(e, "body", None)
+            error = body.get("error", body) if isinstance(body, dict) else {}
+            code = error.get("code") if isinstance(error, dict) else None
+            if code not in ("tool_use_failed", "output_parse_failed") and "tool_use_failed" not in str(e):
                 raise
             self._pending = None
             return self._failed_call(e, request)
@@ -221,8 +224,11 @@ class GroqBrain:
     def observe(self, output: str, is_error: bool, instruction: Optional[str] = None, summary: str = "") -> None:
         if self._pending:
             self._outputs.append((len(self.messages), self._pending_key, summary or output[:200]))
-            if len(output) > GROQ_MAX_OUTPUT_CHARS:
-                output = "[start trimmed]\n" + output[-GROQ_MAX_OUTPUT_CHARS:]
+            # A bounded multi-file read must survive intact; dropping its beginning
+            # silently removes entire files and makes batching counterproductive.
+            limit = 6000 if self._pending_key.startswith("read_files ") else GROQ_MAX_OUTPUT_CHARS
+            if len(output) > limit:
+                output = "[start trimmed]\n" + output[-limit:]
             self.messages.append({"role": "tool", "tool_call_id": self._pending, "content": output})
         else:
             self.messages.append({"role": "user", "content": f"{output}\nTry again with a valid tool call."})

@@ -15,8 +15,11 @@ export type MonitorConfig = {
   costPerTestMinSteps: number;
   errorStreak: number; // this many tool errors in a row
   sameErrorRepeats: number; // or the same error this many times in the window
-  // Plugin-only guards for open-ended sessions with no test suite. Off by default (engine behavior).
+  // Plugin-only guards for open-ended Claude Code sessions. Off by default (engine behavior).
   progressRequired: boolean; // stalling and the per-test spend rule need a test count in the window
+  stallRetries: number; // stalling also needs this many runs of one suite in the window, still failing (0: off)
+  loopFailuresOnly: boolean; // looping only counts repeats that failed: a tool error, or tests still failing
+  looseCommands: boolean; // shell commands compare without cd prefixes, 2>&1, | tail / | head, or verbosity flags
 };
 
 export const DEFAULT_CONFIG: MonitorConfig = {
@@ -29,7 +32,15 @@ export const DEFAULT_CONFIG: MonitorConfig = {
   errorStreak: 3,
   sameErrorRepeats: 3,
   progressRequired: false,
+  stallRetries: 0,
+  loopFailuresOnly: false,
+  looseCommands: false,
 };
+
+// What the plugin runs on Claude Code sessions. Replaying real transcripts (scripts/replay.ts) showed the engine
+// rules firing on healthy work: an all-green suite, a test count left over from one old run or another suite, a
+// passing check rerun after each edit, a screenshot re-read after regenerating it.
+export const SESSION_CONFIG: MonitorConfig = { ...DEFAULT_CONFIG, progressRequired: true, stallRetries: 2, loopFailuresOnly: true, looseCommands: true };
 
 // Python's json.dumps(v, sort_keys=True): ", " and ": " separators, non-ASCII escaped.
 export function pyDumps(v: unknown): string {
@@ -47,9 +58,23 @@ function pyFloat(n: number): string {
   return /[.e]/.test(s) ? s : `${s}.0`;
 }
 
-function actionKey(e: Event): string {
-  return pyDumps([e.tool, e.args, e.result ?? null, e.error || null]);
+function actionKey(e: Event, cfg: MonitorConfig): string {
+  const args = cfg.looseCommands && typeof e.args.command === "string" ? { ...e.args, command: looseCommand(e.args.command) } : e.args;
+  return pyDumps([e.tool, args, e.result ?? null, e.error || null]);
 }
+
+// The same command whatever its plumbing: "cd x && cmd -v 2>&1 | tail -20" is "cmd".
+export function looseCommand(cmd: string): string {
+  return cmd
+    .replace(/^\s*(?:cd\s+(?:"[^"]*"|'[^']*'|\S+)\s*&&\s*)+/, "")
+    .replace(/\s+2>&1\b/g, "")
+    .replace(/(?:\s*\|\s*(?:tail|head)\b[^|]*)+$/, "")
+    .replace(/\s+(?:-v+|--verbose|-q|--quiet)(?=\s|$)/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const failed = (e: Event) => Boolean(e.error) || (e.tool === "run_tests" && e.testsPassing < e.testsTotal);
 
 // Counter.most_common(1): highest count, ties go to the key seen first.
 function mostCommon<T>(items: T[]): [T, number] | null {
@@ -65,9 +90,11 @@ const hasProgress = (events: Event[]) => events.some((e) => e.testsTotal > 0);
 
 export function looping(events: Event[], cfg: MonitorConfig): Finding | null {
   const window = events.slice(-cfg.loopWindow);
-  const top = mostCommon(window.map(actionKey));
+  const counted = cfg.loopFailuresOnly ? window.filter(failed) : window;
+  const key = (e: Event) => actionKey(e, cfg);
+  const top = mostCommon(counted.map(key));
   if (!top || top[1] < cfg.loopRepeats) return null;
-  const repeats = window.filter((e) => actionKey(e) === top[0]);
+  const repeats = counted.filter((e) => key(e) === top[0]);
   const first = repeats[0];
   return {
     kind: "looping",
@@ -80,14 +107,26 @@ export function stalling(events: Event[], cfg: MonitorConfig): Finding | null {
   if (events.length < cfg.stallSteps) return null;
   const recent = events.slice(-cfg.stallSteps);
   if (cfg.progressRequired && !hasProgress(recent)) return null;
-  const before = events.length > cfg.stallSteps ? events[events.length - cfg.stallSteps - 1].testsPassing : recent[0].testsPassing;
-  if (Math.max(...recent.map((e) => e.testsPassing)) > before) return null;
+  const prior = events.length > cfg.stallSteps ? events[events.length - cfg.stallSteps - 1] : recent[0];
+  if (cfg.stallRetries && !retryingOneSuite(prior, recent, cfg.stallRetries)) return null;
+  if (Math.max(...recent.map((e) => e.testsPassing)) > prior.testsPassing) return null;
   const last = recent[recent.length - 1];
   return {
     kind: "stalling",
     summary: `Passing tests stuck at ${last.testsPassing}/${last.testsTotal} for ${cfg.stallSteps} steps`,
     eventIds: recent.map((e) => e.id),
   };
+}
+
+// Session rule: Claude keeps rerunning one suite that still fails. A green suite, a count left over from one old
+// run, or a changed total (another suite, or new tests) isn't a stall.
+function retryingOneSuite(prior: Event, recent: Event[], runs: number): boolean {
+  const last = recent[recent.length - 1];
+  return (
+    last.testsPassing < last.testsTotal &&
+    recent.filter((e) => e.tool === "run_tests").length >= runs &&
+    [prior, ...recent].every((e) => e.testsTotal === last.testsTotal)
+  );
 }
 
 export function overspending(events: Event[], cfg: MonitorConfig, budgetUsd: number): Finding | null {

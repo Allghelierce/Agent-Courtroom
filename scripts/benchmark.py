@@ -32,7 +32,7 @@ def seed_digest(path: Path) -> str:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--tasks", nargs="+", choices=("coding", "prices"), default=["coding", "prices"])
+    parser.add_argument("--tasks", nargs="+", choices=("coding", "prices", "checkout-v2"), default=["coding", "prices"])
     parser.add_argument("--repetitions", type=int, default=3)
     parser.add_argument("--court", default="http://127.0.0.1:4100/verdict")
     parser.add_argument("--brain", choices=("scripted", "claude", "groq"), default="scripted")
@@ -44,7 +44,10 @@ def main():
     parser.add_argument("--decisions", type=Path, help="Decision record to freeze with the benchmark; provides success criteria")
     parser.add_argument("--env-file", type=Path, help="Load API keys from a local ignored dotenv file")
     parser.add_argument("--start-court", action="store_true", help="Start a separate court on a temporary port; same provider as the worker")
+    parser.add_argument("--stripe-sandbox", action="store_true", help="Verify recovered checkout-v2 snapshots through the Stripe sandbox adapter")
     args = parser.parse_args()
+    if args.stripe_sandbox and args.tasks != ["checkout-v2"]:
+        parser.error("--stripe-sandbox requires --tasks checkout-v2")
     if args.env_file:
         if not args.env_file.is_file():
             parser.error("--env-file does not exist")
@@ -109,19 +112,37 @@ def main():
             "revision": revision, "dirtyWorkingTree": dirty, "brain": args.brain,
             "repetitions": args.repetitions, "maxSteps": args.max_steps, "workerBudgetUsd": args.budget,
             "humanEscalation": "stop immediately; no human intervention during comparison",
-            "armOrder": ["withCourt", "withoutCourt"], "successCriteria": args.success_criteria,
+            "armOrder": "alternating: court first on odd pairs", "successCriteria": args.success_criteria,
             "limitation": "Worker budget checked between calls; court costs separate. One pair is exploratory, not a statistical result.",
         }, indent=2) + "\n")
         engine = Engine(bus)
         for task in args.tasks:
             for repetition in range(args.repetitions):
-                result = engine.compare(configs[task])
+                result = engine.compare(configs[task], court_first=repetition % 2 == 0)
                 result.update(repetition=repetition + 1, revision=revision, dirtyWorkingTree=dirty,
                               seedDigest=seed_digest(configs[task].seed))
                 if args.success_criteria:
                     result["successCriteria"] = args.success_criteria
                 results.append(result)
                 (out / "runs.json").write_text(json.dumps(results, indent=2) + "\n")
+                if args.stripe_sandbox:
+                    from courtroom_engine.verification.stripe import evaluate_stripe
+                    for arm in ("withCourt", "withoutCourt"):
+                        run = result[arm]
+                        evidence = Path(run["evidencePath"])
+                        if run.get("recoveryChecks", {}).get("status") == "passed":
+                            # Persisted comparison and worker IDs make interrupted checks retryable.
+                            stripe = evaluate_stripe(evidence / "source", run_id=result["id"] + "-" + run["workerId"],
+                                                     secret_key=os.environ.get("STRIPE_TEST_SECRET_KEY", ""))
+                        else:
+                            stripe = {"status": "not_run", "reason": "Recovery checks did not pass; do not send invalid checkout to Stripe"}
+                        run["stripeChecks"] = stripe
+                        report_file = evidence / "verification.json"
+                        if report_file.exists():
+                            verification = json.loads(report_file.read_text())
+                            verification["stripeChecks"] = stripe
+                            report_file.write_text(json.dumps(verification, indent=2) + "\n")
+                    (out / "runs.json").write_text(json.dumps(results, indent=2) + "\n")
                 print(f"{task} pair {repetition + 1}: {result['withCourt']['state']} / {result['withoutCourt']['state']} ({result['costMode']})", flush=True)
                 # The court quietly runs its $0 mock without a model key; that would fake the savings.
                 fake = set(result["withCourt"]["courtModes"]) & {"mock", "stub"}
@@ -139,11 +160,15 @@ def main():
             rows.append({"task": task, "arm": arm, "runs": len(runs),
                          "engineCompletionRate": sum(r["state"] == "succeeded" for r in runs) / len(runs),
                          "verifiedSuccessRate": None,
+                         "recoveryCheckPassRate": (sum(r.get("recoveryChecks", {}).get("status") == "passed" for r in runs) / len(runs)
+                                                   if task == "checkout-v2" else None),
+                         "stripeCheckPassRate": (sum(r.get("stripeChecks", {}).get("status") == "passed" for r in runs) / len(runs)
+                                                 if args.stripe_sandbox else None),
                          "medianCostUsd": statistics.median(costs) if len(costs) == len(runs) else None,
                          "medianElapsedSeconds": statistics.median(r["seconds"] for r in runs),
                          "courtModes": "/".join(sorted({m for r in runs for m in r["courtModes"]})),
                          "costMode": "simulated" if args.brain == "scripted" else "estimated_from_usage"})
-    summary = {"pairs": len(results), "rows": rows, "limitation": "Engine completion is not independently verified task success. Scripted comparisons measure the script, not model quality. Court-enabled prompts can override task restrictions."}
+    summary = {"pairs": len(results), "rows": rows, "limitation": "Engine completion is not independently verified task success. Scripted comparisons measure the script, not model quality. Checkout-v2 gives both arms equal permissions; legacy coding lets court override restrictions. Sandbox checks are not production certification."}
     (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     with (out / "summary.csv").open("w") as file:
         writer = csv.DictWriter(file, fieldnames=list(rows[0]))
@@ -160,7 +185,7 @@ def main():
                        f"Worker cost: {r['workerCostUsd']}; court: {r['courtCostUsd']}; total: {r['totalCostUsd']} ({result['costMode']}).",
                        f"Evidence capture error: {r['evidenceError'] or 'none'}.",
                        f"[Verification record]({directory}/verification.json)"]
-            if result["task"] == "coding":
+            if result["task"] in ("coding", "checkout-v2"):
                 review += [f"[Saved source]({directory}/source/) · [Diff]({directory}/changes.diff) · [Fresh test output]({directory}/tests.txt)"]
             else:
                 review += [f"[Saved prices and flags]({directory}/prices.json)"]

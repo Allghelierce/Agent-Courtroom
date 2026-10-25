@@ -159,20 +159,21 @@ class Engine:
 
         threading.Thread(target=run, name="comparison", daemon=True).start()
 
-    def compare(self, cfg: RunConfig) -> dict:
+    def compare(self, cfg: RunConfig, *, court_first: bool = True) -> dict:
         """Sequential paired run: include court overhead without resource contention."""
         cfg.validate()
         if cfg.court == "none":
             raise ValueError("Comparison needs a court-enabled arm")
         with_court = self.create_worker(cfg, label="with-court")
         without_court = self.create_worker(cfg, court="none", label="no-court")
-        for worker in (with_court, without_court):
+        for worker in ((with_court, without_court) if court_first else (without_court, with_court)):
             worker.run()
         model = cfg.model or DEFAULT_MODELS[cfg.brain]
         result = {
             "id": f"comparison-{uuid.uuid4().hex}",
             "createdAt": datetime.now(timezone.utc).isoformat(),
             "task": cfg.task,
+            "armOrder": ["withCourt", "withoutCourt"] if court_first else ["withoutCourt", "withCourt"],
             "brain": cfg.brain,
             "model": model,
             "court": cfg.court,

@@ -121,6 +121,7 @@ class GroqBrain:
         ]
         self._pending: Optional[str] = None  # id of the tool call we executed this step
         self._pending_key = ""
+        self._empty_responses = 0
         # (index in messages, tool + args, one-line summary) for every tool output, oldest first
         self._outputs: list[tuple[int, str, str]] = []
 
@@ -187,7 +188,9 @@ class GroqBrain:
         usage = response.usage
         details = getattr(usage, "prompt_tokens_details", None)
         cost = self._cost(usage.prompt_tokens, usage.completion_tokens, getattr(details, "cached_tokens", None) or 0)
-        accounting = {"usage": usage.model_dump(), "model": response.model, "cost_complete": response.model == self.model}
+        usage_record = usage.model_dump()
+        usage_record["finish_reason"] = getattr(response.choices[0], "finish_reason", None)
+        accounting = {"usage": usage_record, "model": response.model, "cost_complete": response.model == self.model}
         message = response.choices[0].message
         calls = message.tool_calls or []
         self.messages.append({
@@ -199,6 +202,22 @@ class GroqBrain:
             ]} if calls else {}),
         })
         text = (message.content or "").strip()
+        self._pending = None
+        if not calls and not text:
+            # Return each retry through the worker loop so its usage, turn, budget,
+            # and failure event are recorded. Never silently retry inside the SDK.
+            if getattr(message, "refusal", None) or usage_record["finish_reason"] == "content_filter":
+                return Action(tool=None, tokens=usage.total_tokens, cost_usd=cost,
+                              text="Provider declined the response.", **accounting)
+            self._empty_responses += 1
+            if self._empty_responses > 2:
+                return Action(tool=None, tokens=usage.total_tokens, cost_usd=cost,
+                              text="Stopped after three consecutive empty model responses (two retries).",
+                              **accounting)
+            return Action(tool="empty_model_response", tokens=usage.total_tokens, cost_usd=cost,
+                          error="Model returned no text or tool call. Continue the task with a valid tool call.",
+                          **accounting)
+        self._empty_responses = 0
         if not calls:
             return Action(tool=None, tokens=usage.total_tokens, cost_usd=cost, text=text, **accounting)
 

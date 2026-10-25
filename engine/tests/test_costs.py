@@ -109,6 +109,50 @@ class CostTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             RunConfig(brain=[]).validate()
 
+    def _response(self, content=None, calls=None, finish_reason="stop"):
+        usage = SimpleNamespace(prompt_tokens=1000, completion_tokens=6, total_tokens=1006,
+                                model_dump=lambda: {"prompt_tokens": 1000, "completion_tokens": 6})
+        return SimpleNamespace(model=DEFAULT_MODELS["groq"], usage=usage,
+                               choices=[SimpleNamespace(finish_reason=finish_reason,
+                                   message=SimpleNamespace(content=content, tool_calls=calls or []))])
+
+    def test_empty_responses_retry_twice_and_preserve_every_calls_usage(self):
+        with self._groq(lambda **kw: self._response()):
+            brain = GroqBrain(get_task("prices"))
+            actions = []
+            for _ in range(3):
+                action = brain.next_action()
+                actions.append(action)
+                if action.tool:
+                    brain.observe(action.error, True)
+        self.assertEqual([a.tool for a in actions], ["empty_model_response", "empty_model_response", None])
+        self.assertIn("three consecutive empty", actions[-1].text)
+        self.assertEqual(sum(a.tokens for a in actions), 3018)
+        self.assertTrue(all(a.cost_complete and a.cost_usd > 0 for a in actions))
+        self.assertEqual(actions[0].usage["finish_reason"], "stop")
+        self.assertIn("valid tool call", brain.messages[-2]["content"])
+
+    def test_valid_tool_call_after_empty_resets_retry_limit_and_pending_id(self):
+        call = SimpleNamespace(id="read-1", function=SimpleNamespace(name="list_files", arguments="{}"))
+        replies = iter([self._response(), self._response(), self._response(calls=[call]), self._response()])
+        with self._groq(lambda **kw: next(replies)):
+            brain = GroqBrain(get_task("prices"))
+            for _ in range(2):
+                action = brain.next_action()
+                brain.observe(action.error, True)
+            self.assertEqual(brain.next_action().tool, "list_files")
+            brain.observe("files", False)
+            self.assertEqual(brain.next_action().tool, "empty_model_response")
+            brain.observe("retry", True)
+        self.assertEqual(brain.messages[-1]["role"], "user")
+
+    def test_visible_completion_and_filtered_responses_do_not_retry(self):
+        for response in [self._response(content="Finished"), self._response(finish_reason="content_filter")]:
+            with self._groq(lambda **kw: response):
+                action = GroqBrain(get_task("prices")).next_action()
+            self.assertIsNone(action.tool)
+            self.assertTrue(action.text)
+
 
 if __name__ == "__main__":
     unittest.main()
